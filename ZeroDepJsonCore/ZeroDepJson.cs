@@ -620,7 +620,25 @@ namespace ZeroDep
             }
         }
 
-        private static JsonAttribute GetJsonAttribute(MemberInfo pi) => pi.GetCustomAttribute<JsonAttribute>();
+        private static JsonAttribute GetJsonAttribute(MemberInfo pi)
+        {
+            var atts = pi.GetCustomAttributes(true);
+            if (atts == null || atts.Length == 0)
+                return null;
+
+            foreach (var obj in atts)
+            {
+#pragma warning disable IDE0083 // Use pattern matching
+                if (!(obj is Attribute att))
+#pragma warning restore IDE0083 // Use pattern matching
+                    continue;
+
+                if (att is JsonAttribute xatt)
+                    return xatt;
+
+            }
+            return null;
+        }
 
         /// <summary>
         /// Gets the type of elements in a collection type.
@@ -770,7 +788,7 @@ namespace ZeroDep
             return ChangeType(value, conversionType);
         }
 
-        private static IReadOnlyList<object> ReadArray(TextReader reader, JsonOptions options)
+        private static object[] ReadArray(TextReader reader, JsonOptions options)
         {
             if (!ReadWhitespaces(reader))
                 return null;
@@ -1846,7 +1864,7 @@ namespace ZeroDep
             /// <param name="type">The type. May not be null.</param>
             /// <param name="options">The options. May be null.</param>
             /// <returns>A list of serialization members.</returns>
-            public static IReadOnlyList<MemberDefinition> GetSerializationMembers(Type type, JsonOptions options = null)
+            public static MemberDefinition[] GetSerializationMembers(Type type, JsonOptions options = null)
             {
                 if (type == null)
                     throw new ArgumentNullException(nameof(type));
@@ -1861,7 +1879,7 @@ namespace ZeroDep
             /// <param name="type">The type. May not be null.</param>
             /// <param name="options">The options. May be null.</param>
             /// <returns>A list of deserialization members.</returns>
-            public static IReadOnlyList<MemberDefinition> GetDeserializationMembers(Type type, JsonOptions options = null)
+            public static MemberDefinition[] GetDeserializationMembers(Type type, JsonOptions options = null)
             {
                 if (type == null)
                     throw new ArgumentNullException(nameof(type));
@@ -2278,7 +2296,9 @@ namespace ZeroDep
                 }
             }
 
-            WriteArray(writer, array, objectGraph, options, Array.Empty<int>());
+#pragma warning disable CA1825 // Avoid zero-length array allocations
+            WriteArray(writer, array, objectGraph, options, new int[0]);
+#pragma warning restore CA1825 // Avoid zero-length array allocations
         }
 
         private static void WriteArray(TextWriter writer, Array array, IDictionary<object, object> objectGraph, JsonOptions options, int[] indices)
@@ -3126,7 +3146,7 @@ namespace ZeroDep
                 }
             }
 
-            public static IReadOnlyList<MemberDefinition> GetDeserializationMembers(Type type, JsonOptions options)
+            public static MemberDefinition[] GetDeserializationMembers(Type type, JsonOptions options)
             {
                 lock (_lock)
                 {
@@ -3135,7 +3155,7 @@ namespace ZeroDep
                 }
             }
 
-            public static IReadOnlyList<MemberDefinition> GetSerializationMembers(Type type, JsonOptions options)
+            public static MemberDefinition[] GetSerializationMembers(Type type, JsonOptions options)
             {
                 lock (_lock)
                 {
@@ -4389,7 +4409,9 @@ namespace ZeroDep
                     throw new ArgumentNullException(nameof(value));
 
                 var typeCode = Convert.GetTypeCode(value);
+#pragma warning disable IDE0010 // Add missing cases
                 switch (typeCode)
+#pragma warning restore IDE0010 // Add missing cases
                 {
                     case TypeCode.SByte:
                     case TypeCode.Int16:
@@ -4573,7 +4595,9 @@ namespace ZeroDep
                     }
 
                     ulong tokenUl;
+#pragma warning disable IDE0010 // Add missing cases
                     switch (Convert.GetTypeCode(tokenValue))
+#pragma warning restore IDE0010 // Add missing cases
                     {
                         case TypeCode.Int16:
                         case TypeCode.Int32:
@@ -4776,7 +4800,7 @@ namespace ZeroDep
         /// <value>
         /// The list of deseralization exceptions.
         /// </value>
-        public virtual IReadOnlyList<Exception> Exceptions => _exceptions.ToArray();
+        public virtual Exception[] Exceptions => _exceptions.ToArray();
 
         /// <summary>
         /// Finalizes the serialization members from an initial setup of members.
