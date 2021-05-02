@@ -1,0 +1,1065 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>ZeroDepJsonCore</name>
+    </assembly>
+    <members>
+        <member name="T:ZeroDep.Json">
+            <summary>
+            A utility class to serialize and deserialize JSON.
+            </summary>
+        </member>
+        <member name="M:ZeroDep.Json.Serialize(System.Object,ZeroDep.JsonOptions)">
+            <summary>
+            Serializes the specified object. Supports anonymous and dynamic types.
+            </summary>
+            <param name="value">The object to serialize.</param>
+            <param name="options">Options to use for serialization.</param>
+            <returns>
+            A JSON representation of the serialized object.
+            </returns>
+        </member>
+        <member name="M:ZeroDep.Json.Serialize(System.IO.TextWriter,System.Object,ZeroDep.JsonOptions)">
+            <summary>
+            Serializes the specified object to the specified TextWriter. Supports anonymous and dynamic types.
+            </summary>
+            <param name="writer">The output writer. May not be null.</param>
+            <param name="value">The object to serialize.</param>
+            <param name="options">Options to use for serialization.</param>
+        </member>
+        <member name="M:ZeroDep.Json.Deserialize(System.String,System.Type,ZeroDep.JsonOptions)">
+            <summary>
+            Deserializes an object from the specified text.
+            </summary>
+            <param name="text">The text text.</param>
+            <param name="targetType">The required target type.</param>
+            <param name="options">Options to use for deserialization.</param>
+            <returns>
+            An instance of an object representing the input data.
+            </returns>
+        </member>
+        <member name="M:ZeroDep.Json.Deserialize``1(System.IO.TextReader,ZeroDep.JsonOptions)">
+            <summary>
+            Deserializes an object from the specified TextReader.
+            </summary>
+            <typeparam name="T">The target type.</typeparam>
+            <param name="reader">The input reader. May not be null.</param>
+            <param name="options">Options to use for deserialization.</param>
+            <returns>
+            An instance of an object representing the input data.
+            </returns>
+        </member>
+        <member name="M:ZeroDep.Json.Deserialize``1(System.String,ZeroDep.JsonOptions)">
+            <summary>
+            Deserializes an object from the specified TextReader.
+            </summary>
+            <typeparam name="T">The target type.</typeparam>
+            <param name="text">The text to deserialize.</param>
+            <param name="options">Options to use for deserialization.</param>
+            <returns>
+            An instance of an object representing the input data.
+            </returns>
+        </member>
+        <member name="M:ZeroDep.Json.Deserialize(System.IO.TextReader,System.Type,ZeroDep.JsonOptions)">
+            <summary>
+            Deserializes an object from the specified TextReader.
+            </summary>
+            <param name="reader">The input reader. May not be null.</param>
+            <param name="targetType">The required target type.</param>
+            <param name="options">Options to use for deserialization.</param>
+            <returns>
+            An instance of an object representing the input data.
+            </returns>
+        </member>
+        <member name="M:ZeroDep.Json.DeserializeToTarget(System.String,System.Object,ZeroDep.JsonOptions)">
+            <summary>
+            Deserializes data from the specified text and populates a specified object instance.
+            </summary>
+            <param name="text">The text to deserialize.</param>
+            <param name="target">The object instance to populate.</param>
+            <param name="options">Options to use for deserialization.</param>
+        </member>
+        <member name="M:ZeroDep.Json.DeserializeToTarget(System.IO.TextReader,System.Object,ZeroDep.JsonOptions)">
+            <summary>
+            Deserializes data from the specified TextReader and populates a specified object instance.
+            </summary>
+            <param name="reader">The input reader. May not be null.</param>
+            <param name="target">The object instance to populate.</param>
+            <param name="options">Options to use for deserialization.</param>
+        </member>
+        <member name="M:ZeroDep.Json.Apply(System.Object,System.Object,ZeroDep.JsonOptions)">
+            <summary>
+            Applies the content of an array or dictionary to a target object.
+            </summary>
+            <param name="input">The input object.</param>
+            <param name="target">The target object.</param>
+            <param name="options">Options to use.</param>
+        </member>
+        <member name="T:ZeroDep.Json.ListObject">
+            <summary>
+            Defines an object that handles list deserialization.
+            </summary>
+        </member>
+        <member name="P:ZeroDep.Json.ListObject.List">
+            <summary>
+            Gets or sets the list object.
+            </summary>
+            <value>
+            The list.
+            </value>
+        </member>
+        <member name="M:ZeroDep.Json.ListObject.Clear">
+            <summary>
+            Clears the list object.
+            </summary>
+        </member>
+        <member name="M:ZeroDep.Json.ListObject.Add(System.Object)">
+            <summary>
+            Adds a value to the list object.
+            </summary>
+            <param name="value">The value.</param>
+        </member>
+        <member name="P:ZeroDep.Json.ListObject.Context">
+            <summary>
+            Gets the current context.
+            </summary>
+            <value>
+            The context. May be null.
+            </value>
+        </member>
+        <member name="M:ZeroDep.Json.GetItemType(System.Type)">
+            <summary>
+            Gets the type of elements in a collection type.
+            </summary>
+            <param name="collectionType">The collection type.</param>
+            <returns>The element type or typeof(object) if it was not determined.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.ChangeType(System.Object,System.Type,ZeroDep.JsonOptions)">
+            <summary>
+            Returns a System.Object with a specified type and whose value is equivalent to a specified input object.
+            If an error occurs, a computed default value of the target type will be returned.
+            </summary>
+            <param name="value">The input object. May be null.</param>
+            <param name="conversionType">The target type. May not be null.</param>
+            <param name="options">The options to use.</param>
+            <returns>
+            An object of the target type whose value is equivalent to input value.
+            </returns>
+        </member>
+        <member name="M:ZeroDep.Json.ChangeType(System.Object,System.Object,System.Type,ZeroDep.JsonOptions)">
+            <summary>
+            Returns a System.Object with a specified type and whose value is equivalent to a specified input object.
+            If an error occurs, a computed default value of the target type will be returned.
+            </summary>
+            <param name="target">The target. May be null.</param>
+            <param name="value">The input object. May be null.</param>
+            <param name="conversionType">The target type. May not be null.</param>
+            <param name="options">The options to use.</param>
+            <returns>
+            An object of the target type whose value is equivalent to input value.
+            </returns>
+        </member>
+        <member name="M:ZeroDep.Json.TryParseDateTime(System.String)">
+            <summary>
+            Converts the JSON string representation of a date time to its DateTime equivalent.
+            </summary>
+            <param name="text">The input text.</param>
+            <returns>A DateTime value if the text was converted successfully; otherwise, null.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.TryParseDateTime(System.String,System.Globalization.DateTimeStyles)">
+            <summary>
+            Converts the JSON string representation of a date time to its DateTime equivalent.
+            </summary>
+            <param name="text">The input text.</param>
+            <param name="styles">The styles to use.</param>
+            <returns>A DateTime value if the text was converted successfully; otherwise, null.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.TryParseDateTime(System.String,System.DateTime@)">
+            <summary>
+            Converts the JSON string representation of a date time to its DateTime equivalent.
+            </summary>
+            <param name="text">The input text.</param>
+            <param name="dt">When this method returns, contains the DateTime equivalent.</param>
+            <returns>true if the text was converted successfully; otherwise, false.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.TryParseDateTime(System.String,System.Globalization.DateTimeStyles,System.DateTime@)">
+            <summary>
+            Converts the JSON string representation of a date time to its DateTime equivalent.
+            </summary>
+            <param name="text">The input text.</param>
+            <param name="styles">The styles to use.</param>
+            <param name="dt">When this method returns, contains the DateTime equivalent.</param>
+            <returns>
+            true if the text was converted successfully; otherwise, false.
+            </returns>
+        </member>
+        <member name="T:ZeroDep.Json.IMemberAccessor">
+            <summary>
+            Defines an interface for quick access to a type member.
+            </summary>
+        </member>
+        <member name="M:ZeroDep.Json.IMemberAccessor.Get(System.Object)">
+            <summary>
+            Gets a component value.
+            </summary>
+            <param name="component">The component.</param>
+            <returns>The value.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.IMemberAccessor.Set(System.Object,System.Object)">
+            <summary>
+            Sets a component's value.
+            </summary>
+            <param name="component">The component.</param>
+            <param name="value">The value to set.</param>
+        </member>
+        <member name="T:ZeroDep.Json.MemberDefinition">
+            <summary>
+            Defines a type's member.
+            </summary>
+        </member>
+        <member name="P:ZeroDep.Json.MemberDefinition.Name">
+            <summary>
+            Gets or sets the member name.
+            </summary>
+            <value>
+            The name.
+            </value>
+        </member>
+        <member name="P:ZeroDep.Json.MemberDefinition.WireName">
+            <summary>
+            Gets or sets the name used for serialization and deserialiation.
+            </summary>
+            <value>
+            The name used during serialization and deserialization.
+            </value>
+        </member>
+        <member name="P:ZeroDep.Json.MemberDefinition.EscapedWireName">
+            <summary>
+            Gets or sets the escaped name used during serialization and deserialiation.
+            </summary>
+            <value>
+            The escaped name used during serialization and deserialiation.
+            </value>
+        </member>
+        <member name="P:ZeroDep.Json.MemberDefinition.HasDefaultValue">
+            <summary>
+            Gets or sets a value indicating whether this instance has default value.
+            </summary>
+            <value>
+            <c>true</c> if this instance has default value; otherwise, <c>false</c>.
+            </value>
+        </member>
+        <member name="P:ZeroDep.Json.MemberDefinition.DefaultValue">
+            <summary>
+            Gets or sets the default value.
+            </summary>
+            <value>
+            The default value.
+            </value>
+        </member>
+        <member name="P:ZeroDep.Json.MemberDefinition.Accessor">
+            <summary>
+            Gets or sets the accessor.
+            </summary>
+            <value>
+            The accessor.
+            </value>
+        </member>
+        <member name="P:ZeroDep.Json.MemberDefinition.Type">
+            <summary>
+            Gets or sets the member type.
+            </summary>
+            <value>
+            The type.
+            </value>
+        </member>
+        <member name="M:ZeroDep.Json.MemberDefinition.ToString">
+            <summary>
+            Returns a <see cref="T:System.String" /> that represents this instance.
+            </summary>
+            <returns>
+            A <see cref="T:System.String" /> that represents this instance.
+            </returns>
+        </member>
+        <member name="M:ZeroDep.Json.MemberDefinition.GetOrCreateInstance(System.Object,System.Int32,ZeroDep.JsonOptions)">
+            <summary>
+            Gets or creates a member instance.
+            </summary>
+            <param name="target">The target.</param>
+            <param name="elementsCount">The elements count.</param>
+            <param name="options">The options.</param>
+            <returns>A new or existing instance.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.MemberDefinition.ApplyEntry(System.Collections.IDictionary,System.Object,System.String,System.Object,ZeroDep.JsonOptions)">
+            <summary>
+            Applies the dictionary entry to this member.
+            </summary>
+            <param name="dictionary">The input dictionary.</param>
+            <param name="target">The target object.</param>
+            <param name="key">The entry key.</param>
+            <param name="value">The entry value.</param>
+            <param name="options">The options.</param>
+        </member>
+        <member name="M:ZeroDep.Json.MemberDefinition.IsNullDateTimeValue(System.Object)">
+            <summary>
+            Determines whether the specified value is equal to the zero value for its type.
+            </summary>
+            <param name="value">The value.</param>
+            <returns>true if the specified value is equal to the zero value.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.MemberDefinition.IsZeroValue(System.Object)">
+            <summary>
+            Determines whether the specified value is equal to the zero value for its type.
+            </summary>
+            <param name="value">The value.</param>
+            <returns>true if the specified value is equal to the zero value.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.MemberDefinition.EqualsDefaultValue(System.Object)">
+            <summary>
+            Determines if a value equals the default value.
+            </summary>
+            <param name="value">The value to compare.</param>
+            <returns>true if both values are equal; false otherwise.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.MemberDefinition.RemoveDeserializationMember(System.Type,ZeroDep.JsonOptions,ZeroDep.Json.MemberDefinition)">
+            <summary>
+            Removes a deserialization member.
+            </summary>
+            <param name="type">The type. May not be null.</param>
+            <param name="options">The options. May be null.</param>
+            <param name="member">The member. May not be null.</param>
+            <returns>true if item is successfully removed; otherwise, false.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.MemberDefinition.RemoveSerializationMember(System.Type,ZeroDep.JsonOptions,ZeroDep.Json.MemberDefinition)">
+            <summary>
+            Removes a serialization member.
+            </summary>
+            <param name="type">The type. May not be null.</param>
+            <param name="options">The options. May be null.</param>
+            <param name="member">The member. May not be null.</param>
+            <returns>true if item is successfully removed; otherwise, false.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.MemberDefinition.AddDeserializationMember(System.Type,ZeroDep.JsonOptions,ZeroDep.Json.MemberDefinition)">
+            <summary>
+            Adds a deserialization member.
+            </summary>
+            <param name="type">The type. May not be null.</param>
+            <param name="options">The options. May be null.</param>
+            <param name="member">The member. May not be null.</param>
+            <returns>true if item is successfully added; otherwise, false.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.MemberDefinition.AddSerializationMember(System.Type,ZeroDep.JsonOptions,ZeroDep.Json.MemberDefinition)">
+            <summary>
+            Adds a serialization member.
+            </summary>
+            <param name="type">The type. May not be null.</param>
+            <param name="options">The options. May be null.</param>
+            <param name="member">The member. May not be null.</param>
+            <returns>true if item is successfully added; otherwise, false.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.MemberDefinition.GetSerializationMembers(System.Type,ZeroDep.JsonOptions)">
+            <summary>
+            Gets the serialization members for a given type.
+            </summary>
+            <param name="type">The type. May not be null.</param>
+            <param name="options">The options. May be null.</param>
+            <returns>A list of serialization members.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.MemberDefinition.GetDeserializationMembers(System.Type,ZeroDep.JsonOptions)">
+            <summary>
+            Gets the deserialization members for a given type.
+            </summary>
+            <param name="type">The type. May not be null.</param>
+            <param name="options">The options. May be null.</param>
+            <returns>A list of deserialization members.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.MemberDefinition.UsingLock``1(System.Action{``0},``0)">
+            <summary>
+            Run a specified action, using the member definition lock.
+            </summary>
+            <typeparam name="T">The action input type.</typeparam>
+            <param name="action">The action. May not be null.</param>
+            <param name="state">The state. May be null.</param>
+        </member>
+        <member name="M:ZeroDep.Json.WriteValue(System.IO.TextWriter,System.Object,System.Collections.Generic.IDictionary{System.Object,System.Object},ZeroDep.JsonOptions)">
+            <summary>
+            Writes a value to a JSON writer.
+            </summary>
+            <param name="writer">The writer. May not be null.</param>
+            <param name="value">The value to writer.</param>
+            <param name="objectGraph">A graph of objects to track cyclic serialization.</param>
+            <param name="options">The options to use.</param>
+        </member>
+        <member name="M:ZeroDep.Json.WriteBase64Stream(System.IO.TextWriter,System.IO.Stream,System.Collections.Generic.IDictionary{System.Object,System.Object},ZeroDep.JsonOptions)">
+            <summary>
+            Writes a stream to a JSON writer.
+            </summary>
+            <param name="writer">The writer. May not be null.</param>
+            <param name="stream">The stream. May not be null.</param>
+            <param name="objectGraph">The object graph.</param>
+            <param name="options">The options to use.</param>
+            <returns>The number of written bytes.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.WriteArray(System.IO.TextWriter,System.Array,System.Collections.Generic.IDictionary{System.Object,System.Object},ZeroDep.JsonOptions)">
+            <summary>
+            Writes an enumerable to a JSON writer.
+            </summary>
+            <param name="writer">The writer. May not be null.</param>
+            <param name="array">The array. May not be null.</param>
+            <param name="objectGraph">The object graph.</param>
+            <param name="options">The options to use.</param>
+        </member>
+        <member name="M:ZeroDep.Json.WriteEnumerable(System.IO.TextWriter,System.Collections.IEnumerable,System.Collections.Generic.IDictionary{System.Object,System.Object},ZeroDep.JsonOptions)">
+            <summary>
+            Writes an enumerable to a JSON writer.
+            </summary>
+            <param name="writer">The writer. May not be null.</param>
+            <param name="enumerable">The enumerable. May not be null.</param>
+            <param name="objectGraph">The object graph.</param>
+            <param name="options">The options to use.</param>
+        </member>
+        <member name="M:ZeroDep.Json.WriteDictionary(System.IO.TextWriter,System.Collections.IDictionary,System.Collections.Generic.IDictionary{System.Object,System.Object},ZeroDep.JsonOptions)">
+            <summary>
+            Writes a dictionary to a JSON writer.
+            </summary>
+            <param name="writer">The writer. May not be null.</param>
+            <param name="dictionary">The dictionary. May not be null.</param>
+            <param name="objectGraph">The object graph.</param>
+            <param name="options">The options to use.</param>
+        </member>
+        <member name="M:ZeroDep.Json.WriteObject(System.IO.TextWriter,System.Object,System.Collections.Generic.IDictionary{System.Object,System.Object},ZeroDep.JsonOptions)">
+            <summary>
+            Writes an object to the JSON writer.
+            </summary>
+            <param name="writer">The writer. May not be null.</param>
+            <param name="value">The object to serialize. May not be null.</param>
+            <param name="objectGraph">The object graph.</param>
+            <param name="options">The options to use.</param>
+        </member>
+        <member name="M:ZeroDep.Json.IsZeroValueType(System.Object)">
+            <summary>
+            Determines whether the specified value is a value type and is equal to zero.
+            </summary>
+            <param name="value">The value.</param>
+            <returns>true if the specified value is a value type and is equal to zero; false otherwise.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.WriteNameValue(System.IO.TextWriter,System.String,System.Object,System.Collections.Generic.IDictionary{System.Object,System.Object},ZeroDep.JsonOptions)">
+            <summary>
+            Writes a name/value pair to a JSON writer.
+            </summary>
+            <param name="writer">The input writer. May not be null.</param>
+            <param name="name">The name. null values will be converted to empty values.</param>
+            <param name="value">The value.</param>
+            <param name="objectGraph">The object graph.</param>
+            <param name="options">The options to use.</param>
+        </member>
+        <member name="M:ZeroDep.Json.WriteString(System.IO.TextWriter,System.String)">
+            <summary>
+            Writes a string to a JSON writer.
+            </summary>
+            <param name="writer">The input writer. May not be null.</param>
+            <param name="text">The text.</param>
+        </member>
+        <member name="M:ZeroDep.Json.WriteUnescapedString(System.IO.TextWriter,System.String)">
+            <summary>
+            Writes a string to a JSON writer.
+            </summary>
+            <param name="writer">The input writer. May not be null.</param>
+            <param name="text">The text.</param>
+        </member>
+        <member name="M:ZeroDep.Json.SerializeFormatted(System.Object,ZeroDep.JsonOptions)">
+            <summary>
+            Serializes an object with format. Note this is more for debugging purposes as it's not designed to be fast.
+            </summary>
+            <param name="value">The JSON object. May be null.</param>
+            <param name="options">The options to use. May be null.</param>
+            <returns>A string containing the formatted object.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.SerializeFormatted(System.IO.TextWriter,System.Object,ZeroDep.JsonOptions)">
+            <summary>
+            Serializes an object with format. Note this is more for debugging purposes as it's not designed to be fast.
+            </summary>
+            <param name="writer">The output writer. May not be null.</param>
+            <param name="value">The JSON object. May be null.</param>
+            <param name="options">The options to use. May be null.</param>
+        </member>
+        <member name="M:ZeroDep.Json.WriteFormatted(System.Object,ZeroDep.JsonOptions)">
+            <summary>
+            Writes a JSON deserialized object formatted.
+            </summary>
+            <param name="jsonObject">The JSON object. May be null.</param>
+            <param name="options">The options to use. May be null.</param>
+            <returns>A string containing the formatted object.</returns>
+        </member>
+        <member name="M:ZeroDep.Json.WriteFormatted(System.IO.TextWriter,System.Object,ZeroDep.JsonOptions)">
+            <summary>
+            Writes a JSON deserialized object formatted.
+            </summary>
+            <param name="writer">The output writer. May not be null.</param>
+            <param name="jsonObject">The JSON object. May be null.</param>
+            <param name="options">The options to use. May be null.</param>
+        </member>
+        <member name="M:ZeroDep.Json.EscapeString(System.String)">
+            <summary>
+            Escapes a string using JSON representation.
+            </summary>
+            <param name="value">The string to escape.</param>
+            <returns>A JSON-escaped string.</returns>
+        </member>
+        <member name="T:ZeroDep.JsonOptions">
+            <summary>
+            Define options for JSON.
+            </summary>
+        </member>
+        <member name="M:ZeroDep.JsonOptions.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:ZeroDep.JsonOptions"/> class.
+            </summary>
+        </member>
+        <member name="M:ZeroDep.JsonOptions.#ctor(System.Boolean)">
+            <summary>
+            Initializes a new instance of the <see cref="T:ZeroDep.JsonOptions"/> class.
+            </summary>
+            <param name="throwExceptions">if set to <c>true</c> exceptions can be thrown on serialization or deserialization.</param>
+        </member>
+        <member name="M:ZeroDep.JsonOptions.Clone">
+            <summary>
+            Clones this instance.
+            </summary>
+            <returns>A newly created insance of this class with all values copied.</returns>
+        </member>
+        <member name="M:ZeroDep.JsonOptions.GetCacheKey">
+            <summary>
+            Gets a key that can be used for type cache.
+            </summary>
+            <returns>A cache key.</returns>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.ThrowExceptions">
+            <summary>
+            Gets or sets a value indicating whether exceptions can be thrown during serialization or deserialization.
+            If this is set to false, exceptions will be stored in the Exceptions collection.
+            </summary>
+            <value>
+            <c>true</c> if exceptions can be thrown on serialization or deserialization; otherwise, <c>false</c>.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.JsonPCallback">
+            <summary>
+            Gets or sets the JSONP callback. It will be added as wrapper around the result.
+            Check this article for more: http://en.wikipedia.org/wiki/JSONP
+            </summary>
+            <value>
+            The JSONP callback name.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.GuidFormat">
+            <summary>
+            Gets or sets the guid format.
+            </summary>
+            <value>
+            The guid format.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.DateTimeFormat">
+            <summary>
+            Gets or sets the date time format.
+            </summary>
+            <value>
+            The date time format.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.DateTimeOffsetFormat">
+            <summary>
+            Gets or sets the date time offset format.
+            </summary>
+            <value>
+            The date time offset format.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.DateTimeStyles">
+            <summary>
+            Gets or sets the date time styles.
+            </summary>
+            <value>
+            The date time styles.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.StreamingBufferChunkSize">
+            <summary>
+            Gets or sets the size of the streaming buffer chunk.
+            </summary>
+            <value>
+            The size of the streaming buffer chunk.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.FormattingTab">
+            <summary>
+            Gets or sets the formatting tab string.
+            </summary>
+            <value>
+            The formatting tab.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.Exceptions">
+            <summary>
+            Gets the deseralization exceptions. Will be empty if ThrowExceptions is set to false.
+            </summary>
+            <value>
+            The list of deseralization exceptions.
+            </value>
+        </member>
+        <member name="M:ZeroDep.JsonOptions.FinalizeSerializationMembers(System.Type,System.Collections.Generic.IEnumerable{ZeroDep.Json.MemberDefinition})">
+            <summary>
+            Finalizes the serialization members from an initial setup of members.
+            </summary>
+            <param name="type">The input type. May not be null.</param>
+            <param name="members">The members. May not be null.</param>
+            <returns>A non-null list of members.</returns>
+        </member>
+        <member name="M:ZeroDep.JsonOptions.FinalizeDeserializationMembers(System.Type,System.Collections.Generic.IEnumerable{ZeroDep.Json.MemberDefinition})">
+            <summary>
+            Finalizes the deserialization members from an initial setup of members.
+            </summary>
+            <param name="type">The input type. May not be null.</param>
+            <param name="members">The members. May not be null.</param>
+            <returns>A non-null list of members.</returns>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.SerializationOptions">
+            <summary>
+            Gets or sets the serialization options.
+            </summary>
+            <value>The serialization options.</value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.WriteValueCallback">
+            <summary>
+            Gets or sets a write value callback.
+            </summary>
+            <value>The callback.</value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.BeforeWriteObjectCallback">
+            <summary>
+            Gets or sets a callback that is called before an object (not a value) is serialized.
+            </summary>
+            <value>The callback.</value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.AfterWriteObjectCallback">
+            <summary>
+            Gets or sets a callback that is called before an object (not a value) is serialized.
+            </summary>
+            <value>The callback.</value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.WriteNamedValueObjectCallback">
+            <summary>
+            Gets or sets a callback that is called before an object field or property is serialized.
+            </summary>
+            <value>The callback.</value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.CreateInstanceCallback">
+            <summary>
+            Gets or sets a callback that is called before an instance of an object is created.
+            </summary>
+            <value>The callback.</value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.MapEntryCallback">
+            <summary>
+            Gets or sets a callback that is called during deserialization, before a dictionary entry is mapped to a target object.
+            </summary>
+            <value>The callback.</value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.ApplyEntryCallback">
+            <summary>
+            Gets or sets a callback that is called during deserialization, before a dictionary entry is applied to a target object.
+            </summary>
+            <value>The callback.</value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.GetListObjectCallback">
+            <summary>
+            Gets or sets a callback that is called during deserialization, to deserialize a list object.
+            </summary>
+            <value>The callback.</value>
+        </member>
+        <member name="T:ZeroDep.JsonCallback">
+            <summary>
+            Defines a callback delegate to customize JSON serialization and deserialization.
+            </summary>
+        </member>
+        <member name="T:ZeroDep.JsonEventType">
+            <summary>
+            Defines a type of JSON event.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonEventType.Unspecified">
+            <summary>
+            An unspecified type of event.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonEventType.WriteValue">
+            <summary>
+            The write value event type.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonEventType.BeforeWriteObject">
+            <summary>
+            The before write object event type.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonEventType.AfterWriteObject">
+            <summary>
+            The after write object event type.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonEventType.WriteNamedValueObject">
+            <summary>
+            The write named value object event type.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonEventType.CreateInstance">
+            <summary>
+            The create instance event type.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonEventType.MapEntry">
+            <summary>
+            The map entry event type.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonEventType.ApplyEntry">
+            <summary>
+            The apply entry event type.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonEventType.GetListObject">
+            <summary>
+            The get list object event type.
+            </summary>
+        </member>
+        <member name="T:ZeroDep.JsonEventArgs">
+            <summary>
+            Provides data for a JSON event.
+            </summary>
+        </member>
+        <member name="M:ZeroDep.JsonEventArgs.#ctor(System.IO.TextWriter,System.Object,System.Collections.Generic.IDictionary{System.Object,System.Object},ZeroDep.JsonOptions)">
+            <summary>
+            Initializes a new instance of the <see cref="T:ZeroDep.JsonEventArgs"/> class.
+            </summary>
+            <param name="writer">The writer currently in use.</param>
+            <param name="value">The value on the stack.</param>
+            <param name="objectGraph">The current serialization object graph.</param>
+            <param name="options">The options currently in use.</param>
+        </member>
+        <member name="M:ZeroDep.JsonEventArgs.#ctor(System.IO.TextWriter,System.Object,System.Collections.Generic.IDictionary{System.Object,System.Object},ZeroDep.JsonOptions,System.String,System.Object)">
+            <summary>
+            Initializes a new instance of the <see cref="T:ZeroDep.JsonEventArgs"/> class.
+            </summary>
+            <param name="writer">The writer currently in use.</param>
+            <param name="value">The value on the stack.</param>
+            <param name="objectGraph">The current serialization object graph.</param>
+            <param name="options">The options currently in use.</param>
+            <param name="name">The field or property name.</param>
+            <param name="component">The component holding the value.</param>
+        </member>
+        <member name="P:ZeroDep.JsonEventArgs.Options">
+            <summary>
+            Gets the options currently in use.
+            </summary>
+            <value>The options.</value>
+        </member>
+        <member name="P:ZeroDep.JsonEventArgs.Writer">
+            <summary>
+            Gets the writer currently in use.
+            </summary>
+            <value>The writer.</value>
+        </member>
+        <member name="P:ZeroDep.JsonEventArgs.ObjectGraph">
+            <summary>
+            Gets the current serialization object graph.
+            </summary>
+            <value>The object graph.</value>
+        </member>
+        <member name="P:ZeroDep.JsonEventArgs.Component">
+            <summary>
+            Gets the component holding the value. May be null.
+            </summary>
+            <value>The component.</value>
+        </member>
+        <member name="P:ZeroDep.JsonEventArgs.EventType">
+            <summary>
+            Gets or sets the type of the event.
+            </summary>
+            <value>
+            The type of the event.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonEventArgs.Handled">
+            <summary>
+            Gets or sets a value indicating whether this <see cref="T:ZeroDep.JsonEventArgs"/> is handled.
+            An handled object can be skipped, not written to the stream. If the object is written, First must be set to false, otherwise it must not be changed.
+            </summary>
+            <value><c>true</c> if handled; otherwise, <c>false</c>.</value>
+        </member>
+        <member name="P:ZeroDep.JsonEventArgs.First">
+            <summary>
+            Gets or sets a value indicating whether the object being handled is first in the list.
+            If the object is handled and written to the stream, this must be set to false after the stream is written.
+            If the object is skipped, it must not be changed.
+            </summary>
+            <value><c>true</c> if this is the first object; otherwise, <c>false</c>.</value>
+        </member>
+        <member name="P:ZeroDep.JsonEventArgs.Value">
+            <summary>
+            Gets or sets the value on the stack.
+            </summary>
+            <value>The value.</value>
+        </member>
+        <member name="P:ZeroDep.JsonEventArgs.Name">
+            <summary>
+            Gets or sets the name on the stack. The Name can be a property or field name when serializing objects. May be null.
+            </summary>
+            <value>The value.</value>
+        </member>
+        <member name="T:ZeroDep.JsonAttribute">
+            <summary>
+            Provides options for JSON.
+            </summary>
+        </member>
+        <member name="M:ZeroDep.JsonAttribute.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:ZeroDep.JsonAttribute"/> class.
+            </summary>
+        </member>
+        <member name="M:ZeroDep.JsonAttribute.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:ZeroDep.JsonAttribute"/> class.
+            </summary>
+            <param name="name">The name to use for JSON serialization and deserialization.</param>
+        </member>
+        <member name="P:ZeroDep.JsonAttribute.Name">
+            <summary>
+            Gets or sets the name to use for JSON serialization and deserialization.
+            </summary>
+            <value>
+            The name.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonAttribute.IgnoreWhenSerializing">
+            <summary>
+            Gets or sets a value indicating whether to ignore this instance's owner when serializing.
+            </summary>
+            <value>
+            <c>true</c> if this instance's owner must be ignored when serializing; otherwise, <c>false</c>.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonAttribute.IgnoreWhenDeserializing">
+            <summary>
+            Gets or sets a value indicating whether to ignore this instance's owner when deserializing.
+            </summary>
+            <value>
+            <c>true</c> if this instance's owner must be ignored when deserializing; otherwise, <c>false</c>.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonAttribute.DefaultValue">
+            <summary>
+            Gets or sets the default value.
+            </summary>
+            <value>
+            The default value.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonAttribute.HasDefaultValue">
+            <summary>
+            Gets or sets a value indicating whether this instance has a default value. In this case, it's defined by the DefaultValue property.
+            </summary>
+            <value>
+            <c>true</c> if this instance has default value; otherwise, <c>false</c>.
+            </value>
+        </member>
+        <member name="T:ZeroDep.JsonSerializationOptions">
+            <summary>
+            Define options for JSON serialization.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.None">
+            <summary>
+            No option.
+            Use Type Descriptor (including custom ones) when serializing custom objects.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.UseReflection">
+            <summary>
+            Use pure reflection when serializing custom objects.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.UseXmlIgnore">
+            <summary>
+            Avoid fields and properties marked with the XmlIgnore attribute.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.DateFormatCustom">
+            <summary>
+            Use the format defined in the DateTimeFormat property of the JsonOptions class.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.SerializeFields">
+            <summary>
+            Serializes fields.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.UseISerializable">
+            <summary>
+            Use the ISerializable interface.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.DateFormatJs">
+            <summary>
+            Use the [new Date(utc milliseconds)] format.
+            Note this format is not generally supported by browsers native JSON parsers.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.DateFormatIso8601">
+            <summary>
+            Use the ISO 8601 string format ('s' DateTime format).
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.UseScriptIgnore">
+            <summary>
+            Avoid fields and properties marked with the ScriptIgnore attribute.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.DateFormatRoundtripUtc">
+            <summary>
+            Use the ISO 8601 roundtrip string format ('o' DateTime format).
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.EnumAsText">
+            <summary>
+            Serialize enum values as text.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.ContinueOnCycle">
+            <summary>
+            Continue serialization if a cycle was detected.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.ContinueOnValueError">
+            <summary>
+            Continue serialization if getting a value throws error.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.SkipNullPropertyValues">
+            <summary>
+            Don't serialize properties with a null value.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.DateTimeOffsetFormatCustom">
+            <summary>
+            Use the format defined in the DateTimeOffsetFormat property of the JsonOptions class.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.SkipNullDateTimeValues">
+            <summary>
+            Don't serialize null date time values.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.AutoParseDateTime">
+            <summary>
+            Automatically parse date time.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.WriteKeysWithoutQuotes">
+            <summary>
+            Write dictionary keys without quotes.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.ByteArrayAsBase64">
+            <summary>
+            Serializes byte arrays as base 64 strings.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.StreamsAsBase64">
+            <summary>
+            Serializes streams as base 64 strings.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.SkipZeroValueTypes">
+            <summary>
+            Don't serialize value type with a zero value.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.UseJsonAttribute">
+            <summary>
+            Use the JSON attribute.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.SkipDefaultValues">
+            <summary>
+            Don't serialize values equal to the default member (property, field) value, if defined.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.TimeSpanAsText">
+            <summary>
+            Serialize TimeSpan values as text.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.Default">
+            <summary>
+            The default value.
+            </summary>
+        </member>
+        <member name="T:ZeroDep.JsonException">
+            <summary>
+            The exception that is thrown when a JSON error occurs.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonException.Prefix">
+            <summary>
+            The commn error prefix.
+            </summary>
+        </member>
+        <member name="M:ZeroDep.JsonException.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:ZeroDep.JsonException"/> class.
+            </summary>
+        </member>
+        <member name="M:ZeroDep.JsonException.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:ZeroDep.JsonException"/> class.
+            </summary>
+            <param name="message">The message that describes the error.</param>
+        </member>
+        <member name="M:ZeroDep.JsonException.#ctor(System.String,System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:ZeroDep.JsonException"/> class.
+            </summary>
+            <param name="message">The error message that explains the reason for the exception.</param>
+            <param name="innerException">The exception that is the cause of the current exception, or a null reference (<see langword="Nothing" /> in Visual Basic) if no inner exception is specified.</param>
+        </member>
+        <member name="M:ZeroDep.JsonException.#ctor(System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:ZeroDep.JsonException"/> class.
+            </summary>
+            <param name="innerException">The inner exception.</param>
+        </member>
+        <member name="M:ZeroDep.JsonException.#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)">
+            <summary>
+            Initializes a new instance of the <see cref="T:ZeroDep.JsonException"/> class.
+            </summary>
+            <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+            <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        </member>
+        <member name="M:ZeroDep.JsonException.GetCode(System.String)">
+            <summary>
+            Gets the errror code.
+            </summary>
+            <param name="message">The message.</param>
+            <returns>The error code.</returns>
+        </member>
+        <member name="P:ZeroDep.JsonException.Code">
+            <summary>
+            Gets the error code.
+            </summary>
+            <value>
+            The error code.
+            </value>
+        </member>
+    </members>
+</doc>
