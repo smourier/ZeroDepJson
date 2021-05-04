@@ -113,11 +113,12 @@
             Clears the list object.
             </summary>
         </member>
-        <member name="M:ZeroDep.Json.ListObject.Add(System.Object)">
+        <member name="M:ZeroDep.Json.ListObject.Add(System.Object,ZeroDep.JsonOptions)">
             <summary>
             Adds a value to the list object.
             </summary>
             <param name="value">The value.</param>
+            <param name="options">The options.</param>
         </member>
         <member name="P:ZeroDep.Json.ListObject.Context">
             <summary>

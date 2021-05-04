@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 using ZeroDep;
 
@@ -24,7 +25,7 @@ namespace ZeoDepJsonTests
             Assert.AreEqual("-56", Json.Serialize((sbyte)-56));
             Assert.AreEqual("-56", Json.Serialize((short)-56));
             Assert.AreEqual("12345", Json.Serialize((ushort)12345));
-            Assert.AreEqual("\"h�llo world\"", Json.Serialize("h�llo world"));
+            Assert.AreEqual("\"héllo world\"", Json.Serialize("héllo world"));
             var ts = new TimeSpan(12, 34, 56, 7, 8);
             Assert.AreEqual("11625670080000", Json.Serialize(ts));
             Assert.AreEqual("\"13:10:56:07.008\"", Json.Serialize(ts, new JsonOptions { SerializationOptions = JsonSerializationOptions.TimeSpanAsText }));
@@ -37,5 +38,52 @@ namespace ZeoDepJsonTests
             Assert.AreEqual("1234.5677", Json.Serialize(1234.5678f));
             Assert.AreEqual("1234.5678", Json.Serialize(1234.5678d));
         }
+
+        [Test]
+        public void TestList()
+        {
+            var list = new List<Customer>();
+            for (var i = 0; i < 10; i++)
+            {
+                var customer = new Customer();
+                customer.Index = i;
+                list.Add(customer);
+            }
+
+            var json = Json.Serialize(list);
+            var list2 = Json.Deserialize<List<Customer>>(json);
+            var json2 = Json.Serialize(list2);
+            Assert.AreEqual(json, json2);
+        }
+
+        [Test]
+        public void TestDictionary()
+        {
+            var dic = new Dictionary<Guid, Customer>();
+            for (var i = 0; i < 10; i++)
+            {
+                var customer = new Customer();
+                customer.Index = i;
+                dic[customer.Id] = customer;
+            }
+
+            var json = Json.Serialize(dic);
+            var list2 = Json.Deserialize(json);
+            var json2 = Json.Serialize(list2);
+            Assert.AreEqual(json, json2);
+        }
+    }
+
+    public class Customer
+    {
+        public Customer()
+        {
+            Id = Guid.NewGuid();
+            Name = "This is a name 这是一个名字" + Environment.TickCount;
+        }
+
+        public Guid Id { get; set; }
+        public int Index { get; set; }
+        public string Name { get; set; }
     }
 }

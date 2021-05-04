@@ -19,6 +19,8 @@ using System.Xml.Serialization;
 #pragma warning disable CA2249 // Consider using 'string.Contains' instead of 'string.IndexOf'
 #pragma warning disable IDE0056 // Use index operator
 #pragma warning disable IDE0054 // Use compound assignment
+#pragma warning disable CA1031 // Do not catch general exception types
+#pragma warning disable CA1034 // Nested types should not be visible
 
 namespace ZeroDep
 {
@@ -334,7 +336,8 @@ namespace ZeroDep
             /// Adds a value to the list object.
             /// </summary>
             /// <param name="value">The value.</param>
-            public abstract void Add(object value);
+            /// <param name="options">The options.</param>
+            public abstract void Add(object value, JsonOptions options = null);
 
             /// <summary>
             /// Gets the current context.
@@ -394,7 +397,7 @@ namespace ZeroDep
                             cvalue = newcvalue;
                         }
 
-                        list.Add(cvalue);
+                        list.Add(cvalue, options);
                     }
                 }
             }
@@ -575,7 +578,7 @@ namespace ZeroDep
             if (target is IDictionary dicTarget)
             {
                 var itemType = GetItemType(dicTarget.GetType());
-                foreach (var entry in dictionary.Cast<DictionaryEntry>())
+                foreach (DictionaryEntry entry in dictionary)
                 {
                     if (entry.Key == null)
                         continue;
@@ -594,7 +597,7 @@ namespace ZeroDep
 
             var def = TypeDef.Get(target.GetType(), options);
 
-            foreach (var entry in dictionary.Cast<DictionaryEntry>())
+            foreach (DictionaryEntry entry in dictionary)
             {
                 if (entry.Key == null)
                     continue;
@@ -785,7 +788,7 @@ namespace ZeroDep
                 }
             }
 
-            return ChangeType(value, conversionType);
+            return Conversions.ChangeType(value, conversionType, null, null);
         }
 
         private static object[] ReadArray(TextReader reader, JsonOptions options)
@@ -2383,7 +2386,7 @@ namespace ZeroDep
             options = options ?? new JsonOptions();
             writer.Write('{');
             var first = true;
-            foreach (var entry in dictionary.Cast<DictionaryEntry>())
+            foreach (DictionaryEntry entry in dictionary)
             {
                 if (entry.Key == null)
                     continue;
@@ -2884,8 +2887,6 @@ namespace ZeroDep
             return t.Length == 0 ? null : t;
         }
 
-        private static object ChangeType(object input, Type conversionType) => input;
-
         private class KeyValueTypeEnumerator : IDictionaryEnumerator
         {
             private readonly IEnumerator _enumerator;
@@ -3377,7 +3378,15 @@ namespace ZeroDep
             }
 
             public override void Clear() => _coll.Clear();
-            public override void Add(object value) => _coll.Add((T)value);
+            public override void Add(object value, JsonOptions options = null)
+            {
+                if (value == null && typeof(T).IsValueType)
+                {
+                    HandleException(new JsonException("JSO0014: JSON error detected. Cannot add null to a collection of '" + typeof(T) + "' elements."), options);
+                }
+
+                _coll.Add((T)value);
+            }
         }
 
         private class IListObject : ListObject
@@ -3395,7 +3404,7 @@ namespace ZeroDep
             }
 
             public override void Clear() => _list.Clear();
-            public override void Add(object value) => _list.Add(value);
+            public override void Add(object value, JsonOptions options = null) => _list.Add(value);
         }
 
         private class FieldInfoAccessor : IMemberAccessor
@@ -3478,22 +3487,6 @@ namespace ZeroDep
 
             private static bool IsValid(DateTime dt) => dt != DateTime.MinValue && dt != DateTime.MaxValue && dt.Kind != DateTimeKind.Unspecified;
 
-            public static object ChangeType(object input, Type conversionType, object defaultValue = null, IFormatProvider provider = null)
-            {
-                if (!TryChangeType(input, conversionType, provider, out var value))
-                {
-                    if (TryChangeType(defaultValue, conversionType, provider, out var def))
-                        return def;
-
-                    if (IsReallyValueType(conversionType))
-                        return Activator.CreateInstance(conversionType);
-
-                    return null;
-                }
-
-                return value;
-            }
-
             public static T ChangeType<T>(object input, T defaultValue = default, IFormatProvider provider = null)
             {
                 if (!TryChangeType(input, provider, out T value))
@@ -3513,6 +3506,22 @@ namespace ZeroDep
 
                 value = (T)tvalue;
                 return true;
+            }
+
+            public static object ChangeType(object input, Type conversionType, object defaultValue = null, IFormatProvider provider = null)
+            {
+                if (!TryChangeType(input, conversionType, provider, out var value))
+                {
+                    if (TryChangeType(defaultValue, conversionType, provider, out var def))
+                        return def;
+
+                    if (IsReallyValueType(conversionType))
+                        return Activator.CreateInstance(conversionType);
+
+                    return null;
+                }
+
+                return value;
             }
 
             public static bool TryChangeType(object input, Type conversionType, out object value) => TryChangeType(input, conversionType, null, out value);
@@ -3879,7 +3888,7 @@ namespace ZeroDep
 
                 if (conversionType == typeof(Guid))
                 {
-                    string svalue = string.Format(provider, "{0}", input).Nullify();
+                    var svalue = string.Format(provider, "{0}", input).Nullify();
                     if (svalue != null && Guid.TryParse(svalue, out var guid))
                     {
                         value = guid;
@@ -3890,7 +3899,7 @@ namespace ZeroDep
 
                 if (conversionType == typeof(Uri))
                 {
-                    string svalue = string.Format(provider, "{0}", input).Nullify();
+                    var svalue = string.Format(provider, "{0}", input).Nullify();
                     if (svalue != null && Uri.TryCreate(svalue, UriKind.RelativeOrAbsolute, out var uri))
                     {
                         value = uri;
@@ -4211,7 +4220,7 @@ namespace ZeroDep
                         }
 
                         var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType));
-                        int count = 0;
+                        var count = 0;
                         foreach (var obj in enumerable)
                         {
                             count++;
@@ -4473,6 +4482,7 @@ namespace ZeroDep
                         value = Activator.CreateInstance(type);
                         return false;
                     }
+
                     value = obj;
                     return true;
                 }
@@ -4582,7 +4592,7 @@ namespace ZeroDep
                 }
 
                 ulong ul = 0;
-                foreach (string tok in tokens)
+                foreach (var tok in tokens)
                 {
                     var token = tok.Nullify(); // NOTE: we don't consider empty tokens as errors
                     if (token == null)
@@ -5308,6 +5318,8 @@ namespace ZeroDep
         public int Code => GetCode(Message);
     }
 
+#pragma warning restore CA1034 // Nested types should not be visible
+#pragma warning restore CA1031 // Do not catch general exception types
 #pragma warning restore IDE0054 // Use compound assignment
 #pragma warning restore IDE0056 // Use index operator
 #pragma warning restore CA2249 // Consider using 'string.Contains' instead of 'string.IndexOf'
