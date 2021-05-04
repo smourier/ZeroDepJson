@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using ZeroDep;
 
@@ -64,13 +65,36 @@ namespace ZeoDepJsonTests
             {
                 var customer = new Customer();
                 customer.Index = i;
+                customer.Name = "This is a name 这是一个名字" + Environment.TickCount;
+                var address1 = new Address();
+                address1.ZipCode = 75000;
+                address1.City = new City();
+                address1.City.Name = "Paris";
+                address1.City.Country = new Country();
+                address1.City.Country.Name = "France";
+
+                var address2 = new Address();
+                address2.ZipCode = 10001;
+                address2.City = new City();
+                address2.City.Name = "New York";
+                address2.City.Country = new Country();
+                address2.City.Country.Name = "USA";
+
+                customer.Addresses = new[] { address1, address2 };
+
                 dic[customer.Id] = customer;
             }
 
-            var json = Json.Serialize(dic);
-            var list2 = Json.Deserialize(json);
+            var json1 = Json.Serialize(dic);
+            var list2 = (Dictionary<string, object>)Json.Deserialize(json1);
             var json2 = Json.Serialize(list2);
-            Assert.AreEqual(json, json2);
+            Assert.AreEqual(json1, json2);
+
+            var customers = list2.Values.Cast<Dictionary<string, object>>().ToList();
+            var json3 = Json.Serialize(customers);
+            var list3 = Json.Deserialize<List<Customer>>(json3);
+            var json4 = Json.Serialize(list3);
+            Assert.AreEqual(json3, json4);
         }
     }
 
@@ -79,11 +103,38 @@ namespace ZeoDepJsonTests
         public Customer()
         {
             Id = Guid.NewGuid();
-            Name = "This is a name 这是一个名字" + Environment.TickCount;
+           
         }
 
-        public Guid Id { get; set; }
+        public Guid Id { get; }
         public int Index { get; set; }
         public string Name { get; set; }
+        
+        public Address[] Addresses { get; set; }
+
+        public override string ToString() => Name;
+    }
+
+    public class Address
+    {
+        public City City { get; set; }
+        public int ZipCode { get; set; }
+
+        public override string ToString() => ZipCode.ToString();
+    }
+
+    public class City
+    {
+        public string Name { get; set; }
+        public Country Country { get; set; }
+
+        public override string ToString() => Name;
+    }
+
+    public class Country
+    {
+        public string Name { get; set; }
+
+        public override string ToString() => Name;
     }
 }

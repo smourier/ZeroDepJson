@@ -162,7 +162,7 @@ namespace ZeroDep
             if (targetType == null || targetType == typeof(object))
                 return ReadValue(reader, options);
 
-            object value = ReadValue(reader, options);
+            var value = ReadValue(reader, options);
             if (value == null)
             {
                 if (targetType.IsValueType)
@@ -365,13 +365,14 @@ namespace ZeroDep
             {
                 var array = list.List as Array;
                 var max = 0;
+                var i = 0;
                 if (array != null)
                 {
+                    i = array.GetLowerBound(0);
                     max = array.GetUpperBound(0);
                 }
 
                 var itemType = GetItemType(list.List.GetType());
-                var i = 0;
                 foreach (var value in input)
                 {
                     if (array != null)
@@ -1691,7 +1692,8 @@ namespace ZeroDep
                     targetValue = Accessor.Get(target);
                 }
 
-                if (targetValue == null)
+                // sufficient array?
+                if (targetValue == null || (targetValue is Array array && array.GetLength(0) < elementsCount))
                 {
                     if (Type.IsInterface)
                         return null;
@@ -2184,7 +2186,7 @@ namespace ZeroDep
 
             using (var ms = new MemoryStream())
             {
-                var bytes = new byte[options.GetStreamingBufferChunkSize()];
+                var bytes = new byte[options.FinalStreamingBufferChunkSize];
                 do
                 {
                     var read = stream.Read(bytes, 0, bytes.Length);
@@ -2209,7 +2211,7 @@ namespace ZeroDep
             // don't dispose this stream or it will dispose the outputStream as well
             var b64 = new CryptoStream(outputStream, new ToBase64Transform(), CryptoStreamMode.Write);
             var total = 0L;
-            var bytes = new byte[options.GetStreamingBufferChunkSize()];
+            var bytes = new byte[options.FinalStreamingBufferChunkSize];
             do
             {
                 var read = inputStream.Read(bytes, 0, bytes.Length);
@@ -3331,6 +3333,9 @@ namespace ZeroDep
                         if (HasScriptIgnore(descriptor))
                             continue;
                     }
+
+                    if (options.SerializationOptions.HasFlag(JsonSerializationOptions.SkipGetOnly) && descriptor.IsReadOnly)
+                        continue;
 
                     var name = GetObjectName(descriptor, descriptor.Name);
 
@@ -4665,25 +4670,16 @@ namespace ZeroDep
     /// </summary>
     public class JsonOptions
     {
-        private List<Exception> _exceptions = new List<Exception>();
+        private readonly List<Exception> _exceptions = new List<Exception>();
         internal static DateTimeStyles _defaultDateTimeStyles = DateTimeStyles.AssumeUniversal | DateTimeStyles.AllowInnerWhite | DateTimeStyles.AllowLeadingWhite | DateTimeStyles.AllowTrailingWhite | DateTimeStyles.AllowWhiteSpaces;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="JsonOptions"/> class.
+        /// Initializes a new instance of the <see cref="JsonOptions" /> class.
         /// </summary>
         public JsonOptions()
-            : this(true)
-        {
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="JsonOptions"/> class.
-        /// </summary>
-        /// <param name="throwExceptions">if set to <c>true</c> exceptions can be thrown on serialization or deserialization.</param>
-        public JsonOptions(bool throwExceptions)
         {
             SerializationOptions = JsonSerializationOptions.Default;
-            ThrowExceptions = throwExceptions;
+            ThrowExceptions = true;
             DateTimeStyles = _defaultDateTimeStyles;
             FormattingTab = " ";
             StreamingBufferChunkSize = ushort.MaxValue;
@@ -4694,49 +4690,6 @@ namespace ZeroDep
         {
             SerializationOptions = serializationOptions;
         }
-
-        /// <summary>
-        /// Clones this instance.
-        /// </summary>
-        /// <returns>A newly created insance of this class with all values copied.</returns>
-        public virtual JsonOptions Clone()
-        {
-            var clone = new JsonOptions();
-            clone.ThrowExceptions = ThrowExceptions;
-            clone.DateTimeFormat = DateTimeFormat;
-            clone.DateTimeOffsetFormat = DateTimeOffsetFormat;
-            clone.DateTimeStyles = DateTimeStyles;
-            clone.FormattingTab = FormattingTab;
-            clone.GuidFormat = GuidFormat;
-            clone.StreamingBufferChunkSize = StreamingBufferChunkSize;
-            clone.SerializationOptions = SerializationOptions;
-            clone.WriteValueCallback = WriteValueCallback;
-            clone.BeforeWriteObjectCallback = BeforeWriteObjectCallback;
-            clone.AfterWriteObjectCallback = AfterWriteObjectCallback;
-            clone.WriteNamedValueObjectCallback = WriteNamedValueObjectCallback;
-            clone.CreateInstanceCallback = CreateInstanceCallback;
-            clone.MapEntryCallback = MapEntryCallback;
-            clone.ApplyEntryCallback = ApplyEntryCallback;
-            clone.GetListObjectCallback = GetListObjectCallback;
-            clone._exceptions = new List<Exception>(_exceptions);
-            return clone;
-        }
-
-        /// <summary>
-        /// Gets a key that can be used for type cache.
-        /// </summary>
-        /// <returns>A cache key.</returns>
-        public virtual string GetCacheKey() => ((int)SerializationOptions).ToString();
-
-        internal int GetStreamingBufferChunkSize()
-        {
-            if (StreamingBufferChunkSize < 512)
-                return 512;
-
-            return StreamingBufferChunkSize;
-        }
-
-        internal void AddException(Exception e) => _exceptions.Add(e);
 
         /// <summary>
         /// Gets or sets a value indicating whether exceptions can be thrown during serialization or deserialization.
@@ -4789,7 +4742,7 @@ namespace ZeroDep
         public virtual DateTimeStyles DateTimeStyles { get; set; }
 
         /// <summary>
-        /// Gets or sets the size of the streaming buffer chunk.
+        /// Gets or sets the size of the streaming buffer chunk. Minimum value is 512.
         /// </summary>
         /// <value>
         /// The size of the streaming buffer chunk.
@@ -4881,6 +4834,43 @@ namespace ZeroDep
         /// </summary>
         /// <value>The callback.</value>
         public virtual JsonCallback GetListObjectCallback { get; set; }
+
+        internal void AddException(Exception e) => _exceptions.Add(e);
+
+        internal int FinalStreamingBufferChunkSize => Math.Max(512, StreamingBufferChunkSize);
+
+        /// <summary>
+        /// Clones this instance.
+        /// </summary>
+        /// <returns>A newly created insance of this class with all values copied.</returns>
+        public virtual JsonOptions Clone()
+        {
+            var clone = new JsonOptions();
+            clone.ThrowExceptions = ThrowExceptions;
+            clone.DateTimeFormat = DateTimeFormat;
+            clone.DateTimeOffsetFormat = DateTimeOffsetFormat;
+            clone.DateTimeStyles = DateTimeStyles;
+            clone.FormattingTab = FormattingTab;
+            clone.GuidFormat = GuidFormat;
+            clone.StreamingBufferChunkSize = StreamingBufferChunkSize;
+            clone.SerializationOptions = SerializationOptions;
+            clone.WriteValueCallback = WriteValueCallback;
+            clone.BeforeWriteObjectCallback = BeforeWriteObjectCallback;
+            clone.AfterWriteObjectCallback = AfterWriteObjectCallback;
+            clone.WriteNamedValueObjectCallback = WriteNamedValueObjectCallback;
+            clone.CreateInstanceCallback = CreateInstanceCallback;
+            clone.MapEntryCallback = MapEntryCallback;
+            clone.ApplyEntryCallback = ApplyEntryCallback;
+            clone.GetListObjectCallback = GetListObjectCallback;
+            clone._exceptions.AddRange(_exceptions);
+            return clone;
+        }
+
+        /// <summary>
+        /// Gets a key that can be used for type cache.
+        /// </summary>
+        /// <returns>A cache key.</returns>
+        public virtual string GetCacheKey() => ((int)SerializationOptions).ToString();
     }
 
     /// <summary>
@@ -5227,9 +5217,14 @@ namespace ZeroDep
         TimeSpanAsText = 0x400000,
 
         /// <summary>
+        /// Skip members with get only method.
+        /// </summary>
+        SkipGetOnly = 0x800000,
+
+        /// <summary>
         /// The default value.
         /// </summary>
-        Default = UseXmlIgnore | UseScriptIgnore | SerializeFields | AutoParseDateTime | UseJsonAttribute,
+        Default = UseXmlIgnore | UseScriptIgnore | SerializeFields | AutoParseDateTime | UseJsonAttribute | SkipGetOnly | SkipDefaultValues | SkipZeroValueTypes | SkipNullPropertyValues | SkipNullDateTimeValues,
     }
 
     /// <summary>

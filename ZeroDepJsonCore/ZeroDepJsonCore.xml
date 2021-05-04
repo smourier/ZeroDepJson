@@ -514,26 +514,8 @@
         </member>
         <member name="M:ZeroDep.JsonOptions.#ctor">
             <summary>
-            Initializes a new instance of the <see cref="T:ZeroDep.JsonOptions"/> class.
+            Initializes a new instance of the <see cref="T:ZeroDep.JsonOptions" /> class.
             </summary>
-        </member>
-        <member name="M:ZeroDep.JsonOptions.#ctor(System.Boolean)">
-            <summary>
-            Initializes a new instance of the <see cref="T:ZeroDep.JsonOptions"/> class.
-            </summary>
-            <param name="throwExceptions">if set to <c>true</c> exceptions can be thrown on serialization or deserialization.</param>
-        </member>
-        <member name="M:ZeroDep.JsonOptions.Clone">
-            <summary>
-            Clones this instance.
-            </summary>
-            <returns>A newly created insance of this class with all values copied.</returns>
-        </member>
-        <member name="M:ZeroDep.JsonOptions.GetCacheKey">
-            <summary>
-            Gets a key that can be used for type cache.
-            </summary>
-            <returns>A cache key.</returns>
         </member>
         <member name="P:ZeroDep.JsonOptions.ThrowExceptions">
             <summary>
@@ -587,7 +569,7 @@
         </member>
         <member name="P:ZeroDep.JsonOptions.StreamingBufferChunkSize">
             <summary>
-            Gets or sets the size of the streaming buffer chunk.
+            Gets or sets the size of the streaming buffer chunk. Minimum value is 512.
             </summary>
             <value>
             The size of the streaming buffer chunk.
@@ -678,6 +660,18 @@
             Gets or sets a callback that is called during deserialization, to deserialize a list object.
             </summary>
             <value>The callback.</value>
+        </member>
+        <member name="M:ZeroDep.JsonOptions.Clone">
+            <summary>
+            Clones this instance.
+            </summary>
+            <returns>A newly created insance of this class with all values copied.</returns>
+        </member>
+        <member name="M:ZeroDep.JsonOptions.GetCacheKey">
+            <summary>
+            Gets a key that can be used for type cache.
+            </summary>
+            <returns>A cache key.</returns>
         </member>
         <member name="T:ZeroDep.JsonCallback">
             <summary>
@@ -999,6 +993,11 @@
         <member name="F:ZeroDep.JsonSerializationOptions.TimeSpanAsText">
             <summary>
             Serialize TimeSpan values as text.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.JsonSerializationOptions.SkipGetOnly">
+            <summary>
+            Skip members with get only method.
             </summary>
         </member>
         <member name="F:ZeroDep.JsonSerializationOptions.Default">
