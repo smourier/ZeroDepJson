@@ -113,6 +113,7 @@ namespace ZeroDep
 
                 if (!targetType.IsValueType)
                     return null;
+                
                 return CreateInstance(null, targetType, 0, options, text);
             }
 
@@ -2470,14 +2471,6 @@ namespace ZeroDep
 
             objectGraph = objectGraph ?? new Dictionary<object, object>();
             options = options ?? new JsonOptions();
-            if (options.BeforeWriteObjectCallback != null)
-            {
-                var e = new JsonEventArgs(writer, value, objectGraph, options);
-                e.EventType = JsonEventType.BeforeWriteObject;
-                options.BeforeWriteObjectCallback(e);
-                if (e.Handled)
-                    return;
-            }
 
             ISerializable serializable = null;
             var useISerializable = options.SerializationOptions.HasFlag(JsonSerializationOptions.UseISerializable) || ForceSerializable(value);
@@ -2487,8 +2480,17 @@ namespace ZeroDep
             }
 
             writer.Write('{');
-            var type = value.GetType();
 
+            if (options.BeforeWriteObjectCallback != null)
+            {
+                var e = new JsonEventArgs(writer, value, objectGraph, options);
+                e.EventType = JsonEventType.BeforeWriteObject;
+                options.BeforeWriteObjectCallback(e);
+                if (e.Handled)
+                    return;
+            }
+
+            var type = value.GetType();
             if (serializable != null)
             {
                 WriteSerializable(writer, serializable, objectGraph, options);
@@ -4683,22 +4685,26 @@ namespace ZeroDep
             DateTimeStyles = _defaultDateTimeStyles;
             FormattingTab = " ";
             StreamingBufferChunkSize = ushort.MaxValue;
-        }
-
-        internal JsonOptions(JsonSerializationOptions serializationOptions)
-            : this()
-        {
-            SerializationOptions = serializationOptions;
+            MaximumExceptionsCount = 100;
         }
 
         /// <summary>
         /// Gets or sets a value indicating whether exceptions can be thrown during serialization or deserialization.
         /// If this is set to false, exceptions will be stored in the Exceptions collection.
+        /// However, if the number of exceptions is equal to or higher than MaximumExceptionsCount, an exception will be thrown.
         /// </summary>
         /// <value>
         /// <c>true</c> if exceptions can be thrown on serialization or deserialization; otherwise, <c>false</c>.
         /// </value>
         public virtual bool ThrowExceptions { get; set; }
+
+        /// <summary>
+        /// Gets or sets the maximum exceptions count.
+        /// </summary>
+        /// <value>
+        /// The maximum exceptions count.
+        /// </value>
+        public virtual int MaximumExceptionsCount { get; set; }
 
         /// <summary>
         /// Gets or sets the JSONP callback. It will be added as wrapper around the result.
@@ -4835,7 +4841,20 @@ namespace ZeroDep
         /// <value>The callback.</value>
         public virtual JsonCallback GetListObjectCallback { get; set; }
 
-        internal void AddException(Exception e) => _exceptions.Add(e);
+        /// <summary>
+        /// Adds an exception to the list of exceptions.
+        /// </summary>
+        /// <param name="error">The exception to add.</param>
+        public virtual void AddException(Exception error)
+        {
+            if (error == null)
+                throw new ArgumentNullException(nameof(error));
+
+            if (_exceptions.Count >= MaximumExceptionsCount)
+                throw new JsonException("JSO0015: Two many JSON errors detected (" + _exceptions.Count + ").", error);
+
+            _exceptions.Add(error);
+        }
 
         internal int FinalStreamingBufferChunkSize => Math.Max(512, StreamingBufferChunkSize);
 
@@ -4846,23 +4865,24 @@ namespace ZeroDep
         public virtual JsonOptions Clone()
         {
             var clone = new JsonOptions();
-            clone.ThrowExceptions = ThrowExceptions;
+            clone.AfterWriteObjectCallback = AfterWriteObjectCallback;
+            clone.ApplyEntryCallback = ApplyEntryCallback;
+            clone.BeforeWriteObjectCallback = BeforeWriteObjectCallback;
+            clone.CreateInstanceCallback = CreateInstanceCallback;
             clone.DateTimeFormat = DateTimeFormat;
             clone.DateTimeOffsetFormat = DateTimeOffsetFormat;
             clone.DateTimeStyles = DateTimeStyles;
-            clone.FormattingTab = FormattingTab;
-            clone.GuidFormat = GuidFormat;
-            clone.StreamingBufferChunkSize = StreamingBufferChunkSize;
-            clone.SerializationOptions = SerializationOptions;
-            clone.WriteValueCallback = WriteValueCallback;
-            clone.BeforeWriteObjectCallback = BeforeWriteObjectCallback;
-            clone.AfterWriteObjectCallback = AfterWriteObjectCallback;
-            clone.WriteNamedValueObjectCallback = WriteNamedValueObjectCallback;
-            clone.CreateInstanceCallback = CreateInstanceCallback;
-            clone.MapEntryCallback = MapEntryCallback;
-            clone.ApplyEntryCallback = ApplyEntryCallback;
-            clone.GetListObjectCallback = GetListObjectCallback;
             clone._exceptions.AddRange(_exceptions);
+            clone.FormattingTab = FormattingTab;
+            clone.GetListObjectCallback = GetListObjectCallback;
+            clone.GuidFormat = GuidFormat;
+            clone.MapEntryCallback = MapEntryCallback;
+            clone.MaximumExceptionsCount = MaximumExceptionsCount;
+            clone.SerializationOptions = SerializationOptions;
+            clone.StreamingBufferChunkSize = StreamingBufferChunkSize;
+            clone.ThrowExceptions = ThrowExceptions;
+            clone.WriteNamedValueObjectCallback = WriteNamedValueObjectCallback;
+            clone.WriteValueCallback = WriteValueCallback;
             return clone;
         }
 
@@ -5029,7 +5049,7 @@ namespace ZeroDep
     /// Provides options for JSON.
     /// </summary>
     [AttributeUsage(AttributeTargets.All)]
-    public class JsonAttribute : Attribute
+    public sealed class JsonAttribute : Attribute
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="JsonAttribute"/> class.

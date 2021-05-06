@@ -521,9 +521,18 @@
             <summary>
             Gets or sets a value indicating whether exceptions can be thrown during serialization or deserialization.
             If this is set to false, exceptions will be stored in the Exceptions collection.
+            However, if the number of exceptions is equal to or higher than MaximumExceptionsCount, an exception will be thrown.
             </summary>
             <value>
             <c>true</c> if exceptions can be thrown on serialization or deserialization; otherwise, <c>false</c>.
+            </value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.MaximumExceptionsCount">
+            <summary>
+            Gets or sets the maximum exceptions count.
+            </summary>
+            <value>
+            The maximum exceptions count.
             </value>
         </member>
         <member name="P:ZeroDep.JsonOptions.JsonPCallback">
@@ -660,6 +669,12 @@
             Gets or sets a callback that is called during deserialization, to deserialize a list object.
             </summary>
             <value>The callback.</value>
+        </member>
+        <member name="M:ZeroDep.JsonOptions.AddException(System.Exception)">
+            <summary>
+            Adds an exception to the list of exceptions.
+            </summary>
+            <param name="error">The exception to add.</param>
         </member>
         <member name="M:ZeroDep.JsonOptions.Clone">
             <summary>
