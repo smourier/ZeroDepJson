@@ -10,4 +10,4 @@ There are already many JSON serializers available on the .NET platform. So why Z
 * It's quite feature-full, more than some JSON parsers available today, it's not  "simple" nor "lightweight".
 
 
-Just to make it clear, raw performance is not a goal. Although its performance is, I hope, decent, if you're after the best performing JSON serializer / deserializer, than don't use this.
+Just to make it clear, raw performance is not a goal. Although its performance is, I hope, decent, if you're after the best performing JSON serializer / deserializer, then don't use this.
