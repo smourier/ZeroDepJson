@@ -507,6 +507,42 @@
             <param name="value">The string to escape.</param>
             <returns>A JSON-escaped string.</returns>
         </member>
+        <member name="M:ZeroDep.Json.GetNullifiedStringValueByPath(System.Collections.Generic.IDictionary{System.String,System.Object},System.String)">
+            <summary>
+            Gets a nullified string value from a dictionary by its path.
+            This is useful to get a string value from the object that the untyped Deserialize method returns which is often of IDictionary&lt;string, object&gt; type.
+            </summary>
+            <param name="dictionary">The input dictionary.</param>
+            <param name="path">The path, composed of dictionary keys separated by a . character. May not be null.</param>
+            <returns>
+            The nullified string value or null if not found.
+            </returns>
+        </member>
+        <member name="M:ZeroDep.Json.TryGetValueByPath``1(System.Collections.Generic.IDictionary{System.String,System.Object},System.String,``0@)">
+            <summary>
+            Gets a value from a dictionary by its path.
+            This is useful to get a value from the object that the untyped Deserialize method returns which is often of IDictionary&lt;string, object&gt; type.
+            </summary>
+            <typeparam name="T">The final type to which to convert the retrieved value.</typeparam>
+            <param name="dictionary">The input dictionary.</param>
+            <param name="path">The path, composed of dictionary keys separated by a . character. May not be null.</param>
+            <param name="value">The value to retrieve.</param>
+            <returns>
+            true if the value parameter was retrieved successfully; otherwise, false.
+            </returns>
+        </member>
+        <member name="M:ZeroDep.Json.TryGetValueByPath(System.Collections.Generic.IDictionary{System.String,System.Object},System.String,System.Object@)">
+            <summary>
+            Gets a value from a dictionary by its path.
+            This is useful to get a value from the object that the untyped Deserialize method returns which is often of IDictionary&lt;string, object&gt; type.
+            </summary>
+            <param name="dictionary">The input dictionary.</param>
+            <param name="path">The path, composed of dictionary keys separated by a . character. May not be null.</param>
+            <param name="value">The value to retrieve.</param>
+            <returns>
+            true if the value parameter was retrieved successfully; otherwise, false.
+            </returns>
+        </member>
         <member name="T:ZeroDep.JsonOptions">
             <summary>
             Define options for JSON.
