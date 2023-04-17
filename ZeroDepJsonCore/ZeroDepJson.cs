@@ -80,6 +80,9 @@ namespace ZeroDep
                 throw new ArgumentNullException(nameof(writer));
 
             options = options ?? new JsonOptions();
+            var objectGraph = options.FinalObjectGraph;
+            SetOptions(objectGraph, options);
+
             var jsonp = options.JsonPCallback.Nullify();
             if (jsonp != null)
             {
@@ -87,7 +90,7 @@ namespace ZeroDep
                 writer.Write('(');
             }
 
-            WriteValue(writer, value, new Dictionary<object, object>(ReferenceComparer._current), options);
+            WriteValue(writer, value, objectGraph, options);
             if (jsonp != null)
             {
                 writer.Write(')');
@@ -1537,6 +1540,18 @@ namespace ZeroDep
         }
 
         /// <summary>
+        /// Defines an interface for setting or getting options.
+        /// </summary>
+        public interface IOptionsHolder
+        {
+            /// <summary>
+            /// Gets or sets the options.
+            /// </summary>
+            /// <value>The options.</value>
+            JsonOptions Options { get; set; }
+        }
+
+        /// <summary>
         /// Defines an interface for quick access to a type member.
         /// </summary>
         public interface IMemberAccessor
@@ -1573,7 +1588,7 @@ namespace ZeroDep
             /// <value>
             /// The name.
             /// </value>
-            public string Name
+            public virtual string Name
             {
                 get => _name;
                 set
@@ -1591,7 +1606,7 @@ namespace ZeroDep
             /// <value>
             /// The name used during serialization and deserialization.
             /// </value>
-            public string WireName
+            public virtual string WireName
             {
                 get => _wireName;
                 set
@@ -1609,7 +1624,7 @@ namespace ZeroDep
             /// <value>
             /// The escaped name used during serialization and deserialiation.
             /// </value>
-            public string EscapedWireName
+            public virtual string EscapedWireName
             {
                 get => _escapedWireName;
                 set
@@ -1627,7 +1642,7 @@ namespace ZeroDep
             /// <value>
             /// <c>true</c> if this instance has default value; otherwise, <c>false</c>.
             /// </value>
-            public bool HasDefaultValue { get; set; }
+            public virtual bool HasDefaultValue { get; set; }
 
             /// <summary>
             /// Gets or sets the default value.
@@ -1635,7 +1650,7 @@ namespace ZeroDep
             /// <value>
             /// The default value.
             /// </value>
-            public object DefaultValue { get; set; }
+            public virtual object DefaultValue { get; set; }
 
             /// <summary>
             /// Gets or sets the accessor.
@@ -1643,7 +1658,7 @@ namespace ZeroDep
             /// <value>
             /// The accessor.
             /// </value>
-            public IMemberAccessor Accessor
+            public virtual IMemberAccessor Accessor
             {
                 get => _accessor;
                 set => _accessor = value ?? throw new ArgumentNullException(nameof(value));
@@ -1655,7 +1670,7 @@ namespace ZeroDep
             /// <value>
             /// The type.
             /// </value>
-            public Type Type
+            public virtual Type Type
             {
                 get => _type;
                 set => _type = value ?? throw new ArgumentNullException(nameof(value));
@@ -1927,8 +1942,10 @@ namespace ZeroDep
             if (writer == null)
                 throw new ArgumentNullException(nameof(writer));
 
-            objectGraph = objectGraph ?? new Dictionary<object, object>();
             options = options ?? new JsonOptions();
+            objectGraph = objectGraph ?? options.FinalObjectGraph;
+            SetOptions(objectGraph, options);
+
             if (options.WriteValueCallback != null)
             {
                 var e = new JsonEventArgs(writer, value, objectGraph, options)
@@ -2129,10 +2146,12 @@ namespace ZeroDep
             }
 
             objectGraph.Add(value, null);
+            options.SerializationLevel++;
 
             if (value is IDictionary dictionary)
             {
                 WriteDictionary(writer, dictionary, objectGraph, options);
+                options.SerializationLevel--;
                 return;
             }
 
@@ -2140,12 +2159,14 @@ namespace ZeroDep
             if (TypeDef.IsKeyValuePairEnumerable(value.GetType(), out var _, out var _))
             {
                 WriteDictionary(writer, new KeyValueTypeDictionary(value), objectGraph, options);
+                options.SerializationLevel--;
                 return;
             }
 
             if (value is IEnumerable enumerable)
             {
                 WriteEnumerable(writer, enumerable, objectGraph, options);
+                options.SerializationLevel--;
                 return;
             }
 
@@ -2154,11 +2175,13 @@ namespace ZeroDep
                 if (value is Stream stream)
                 {
                     WriteBase64Stream(writer, stream, objectGraph, options);
+                    options.SerializationLevel--;
                     return;
                 }
             }
 
             WriteObject(writer, value, objectGraph, options);
+            options.SerializationLevel--;
         }
 
         /// <summary>
@@ -2177,10 +2200,11 @@ namespace ZeroDep
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream));
 
-            objectGraph = objectGraph ?? new Dictionary<object, object>();
             options = options ?? new JsonOptions();
-            var total = 0L;
+            objectGraph = objectGraph ?? options.FinalObjectGraph;
+            SetOptions(objectGraph, options);
 
+            var total = 0L;
             if (writer is StreamWriter sw && sw.BaseStream != null)
             {
                 sw.Flush();
@@ -2211,6 +2235,14 @@ namespace ZeroDep
                 writer.Write(Convert.ToBase64String(ms.ToArray()));
                 writer.Write('"');
                 return total;
+            }
+        }
+
+        private static void SetOptions(object obj, JsonOptions options)
+        {
+            if (obj is IOptionsHolder holder)
+            {
+                holder.Options = options;
             }
         }
 
@@ -2295,8 +2327,10 @@ namespace ZeroDep
             if (array == null)
                 throw new ArgumentNullException(nameof(array));
 
-            objectGraph = objectGraph ?? new Dictionary<object, object>();
             options = options ?? new JsonOptions();
+            objectGraph = objectGraph ?? options.FinalObjectGraph;
+            SetOptions(objectGraph, options);
+
             if (options.SerializationOptions.HasFlag(JsonSerializationOptions.ByteArrayAsBase64))
             {
                 if (array is byte[] bytes)
@@ -2359,8 +2393,10 @@ namespace ZeroDep
             if (enumerable == null)
                 throw new ArgumentNullException(nameof(enumerable));
 
-            objectGraph = objectGraph ?? new Dictionary<object, object>();
             options = options ?? new JsonOptions();
+            objectGraph = objectGraph ?? options.FinalObjectGraph;
+            SetOptions(objectGraph, options);
+
             writer.Write('[');
             var first = true;
             foreach (var value in enumerable)
@@ -2393,8 +2429,10 @@ namespace ZeroDep
             if (dictionary == null)
                 throw new ArgumentNullException(nameof(dictionary));
 
-            objectGraph = objectGraph ?? new Dictionary<object, object>();
             options = options ?? new JsonOptions();
+            objectGraph = objectGraph ?? options.FinalObjectGraph;
+            SetOptions(objectGraph, options);
+
             writer.Write('{');
             var first = true;
             foreach (DictionaryEntry entry in dictionary)
@@ -2477,8 +2515,9 @@ namespace ZeroDep
             if (value == null)
                 throw new ArgumentNullException(nameof(value));
 
-            objectGraph = objectGraph ?? new Dictionary<object, object>();
             options = options ?? new JsonOptions();
+            objectGraph = objectGraph ?? options.FinalObjectGraph;
+            SetOptions(objectGraph, options);
 
             ISerializable serializable = null;
             var useISerializable = options.SerializationOptions.HasFlag(JsonSerializationOptions.UseISerializable) || ForceSerializable(value);
@@ -2555,6 +2594,9 @@ namespace ZeroDep
 
             name = name ?? string.Empty;
             options = options ?? new JsonOptions();
+            objectGraph = objectGraph ?? options.FinalObjectGraph;
+            SetOptions(objectGraph, options);
+
             if (options.SerializationOptions.HasFlag(JsonSerializationOptions.WriteKeysWithoutQuotes))
             {
                 writer.Write(EscapeString(name));
@@ -2994,7 +3036,7 @@ namespace ZeroDep
             return t.Length == 0 ? null : t;
         }
 
-        private class KeyValueTypeEnumerator : IDictionaryEnumerator
+        private sealed class KeyValueTypeEnumerator : IDictionaryEnumerator
         {
             private readonly IEnumerator _enumerator;
             private PropertyInfo _keyProp;
@@ -3026,7 +3068,7 @@ namespace ZeroDep
             public void Reset() => _enumerator.Reset();
         }
 
-        private class KeyValueTypeDictionary : IDictionary
+        private sealed class KeyValueTypeDictionary : IDictionary
         {
             private readonly KeyValueTypeEnumerator _enumerator;
 
@@ -3053,13 +3095,13 @@ namespace ZeroDep
             IEnumerator IEnumerable.GetEnumerator() => throw new NotSupportedException();
         }
 
-        private class KeyValueType
+        private sealed class KeyValueType
         {
             public Type KeyType;
             public Type ValueType;
         }
 
-        private class TypeDef
+        private sealed class TypeDef
         {
             private static readonly Dictionary<string, TypeDef> _defs = new Dictionary<string, TypeDef>();
             private static readonly Dictionary<Type, KeyValueType> _iskvpe = new Dictionary<Type, KeyValueType>();
@@ -3473,15 +3515,25 @@ namespace ZeroDep
             }
         }
 
-        private class ReferenceComparer : IEqualityComparer<object>
+        /// <summary>
+        /// A utility class to compare object by their reference.
+        /// </summary>
+        public sealed class ReferenceComparer : IEqualityComparer<object>
         {
-            internal static readonly ReferenceComparer _current = new ReferenceComparer();
+            /// <summary>
+            /// Gets the instance of the ReferenceComparer class.
+            /// </summary>
+            public static readonly ReferenceComparer Instance = new ReferenceComparer();
+
+            private ReferenceComparer()
+            {
+            }
 
             bool IEqualityComparer<object>.Equals(object x, object y) => ReferenceEquals(x, y);
             int IEqualityComparer<object>.GetHashCode(object obj) => RuntimeHelpers.GetHashCode(obj);
         }
 
-        private class ICollectionTObject<T> : ListObject
+        private sealed class ICollectionTObject<T> : ListObject
         {
             private ICollection<T> _coll;
 
@@ -3507,7 +3559,7 @@ namespace ZeroDep
             }
         }
 
-        private class IListObject : ListObject
+        private sealed class IListObject : ListObject
         {
             private IList _list;
 
@@ -3525,7 +3577,7 @@ namespace ZeroDep
             public override void Add(object value, JsonOptions options = null) => _list.Add(value);
         }
 
-        private class FieldInfoAccessor : IMemberAccessor
+        private sealed class FieldInfoAccessor : IMemberAccessor
         {
             private readonly FieldInfo _fi;
 
@@ -3538,7 +3590,7 @@ namespace ZeroDep
             public void Set(object component, object value) => _fi.SetValue(component, value);
         }
 
-        private class PropertyDescriptorAccessor : IMemberAccessor
+        private sealed class PropertyDescriptorAccessor : IMemberAccessor
         {
             private readonly PropertyDescriptor _pd;
 
@@ -3561,7 +3613,7 @@ namespace ZeroDep
         private delegate TResult JFunc<T, TResult>(T arg);
         private delegate void JAction<T1, T2>(T1 arg1, T2 arg2);
 
-        private class PropertyInfoAccessor<TComponent, TMember> : IMemberAccessor
+        private sealed class PropertyInfoAccessor<TComponent, TMember> : IMemberAccessor
         {
             private readonly JFunc<TComponent, TMember> _get;
             private readonly JAction<TComponent, TMember> _set;
@@ -4804,6 +4856,14 @@ namespace ZeroDep
         }
 
         /// <summary>
+        /// Gets a value indicating the current serialization level.
+        /// </summary>
+        /// <value>
+        /// The current serialization level.
+        /// </value>
+        public int SerializationLevel { get; internal set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether exceptions can be thrown during serialization or deserialization.
         /// If this is set to false, exceptions will be stored in the Exceptions collection.
         /// However, if the number of exceptions is equal to or higher than MaximumExceptionsCount, an exception will be thrown.
@@ -4959,6 +5019,13 @@ namespace ZeroDep
         public virtual JsonCallback GetListObjectCallback { get; set; }
 
         /// <summary>
+        /// Gets or sets a utility class that will store an object graph to avoid serialization cycles.
+        /// If null, a Dictionary&lt;object, object&gt; using an object reference comparer will be used.
+        /// </summary>
+        /// <value>The object graph instance.</value>
+        public virtual IDictionary<object, object> ObjectGraph { get; set; }
+
+        /// <summary>
         /// Adds an exception to the list of exceptions.
         /// </summary>
         /// <param name="error">The exception to add.</param>
@@ -4974,6 +5041,7 @@ namespace ZeroDep
         }
 
         internal int FinalStreamingBufferChunkSize => Math.Max(512, StreamingBufferChunkSize);
+        internal IDictionary<object, object> FinalObjectGraph => ObjectGraph ?? new Dictionary<object, object>(ZeroDep.Json.ReferenceComparer.Instance);
 
         /// <summary>
         /// Clones this instance.

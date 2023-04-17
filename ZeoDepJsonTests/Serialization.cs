@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using NUnit.Framework;
 using ZeroDep;
@@ -96,6 +98,83 @@ namespace ZeoDepJsonTests
             var json4 = Json.Serialize(list3);
             Assert.AreEqual(json3, json4);
         }
+
+        [Test]
+        public void TestCyclic()
+        {
+            var person = new Person { Name = "foo" };
+            var persons = new Person[] { person, person };
+            try
+            {
+                var json = Json.Serialize(persons);
+                Assert.Fail();
+            }
+            catch (JsonException ex)
+            {
+                Assert.IsTrue(ex.Code == 9);
+            }
+        }
+
+        [Test]
+        public void TestCyclicCustom()
+        {
+            var person = new Person { Name = "héllo" };
+            var persons = new Person[] { person, person };
+            var options = new CustomOptions();
+            var json = Json.Serialize(persons, options);
+            Assert.IsTrue(json == "[{\"Name\":\"héllo\"},{\"Name\":\"héllo\"}]");
+        }
+    }
+
+    class CustomOptions : JsonOptions
+    {
+        public CustomOptions()
+        {
+            ObjectGraph = new CustomObjectGraph();
+        }
+
+        private class CustomObjectGraph : IDictionary<object, object>, Json.IOptionsHolder
+        {
+            private readonly Dictionary<object, int> _hash = new Dictionary<object, int>();
+
+            public JsonOptions Options { get; set; }
+
+            public void Add(object key, object value)
+            {
+                _hash[key] = Options.SerializationLevel;
+            }
+
+            public bool ContainsKey(object key)
+            {
+                if (!_hash.TryGetValue(key, out var level))
+                    return false;
+
+                if (Options.SerializationLevel == level)
+                    return false;
+
+                return true;
+            }
+
+            public object this[object key] { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+            public ICollection<object> Keys => throw new NotImplementedException();
+            public ICollection<object> Values => throw new NotImplementedException();
+            public int Count => throw new NotImplementedException();
+            public bool IsReadOnly => throw new NotImplementedException();
+            public void Add(KeyValuePair<object, object> item) => throw new NotImplementedException();
+            public void Clear() => throw new NotImplementedException();
+            public bool Contains(KeyValuePair<object, object> item) => throw new NotImplementedException();
+            public void CopyTo(KeyValuePair<object, object>[] array, int arrayIndex) => throw new NotImplementedException();
+            public IEnumerator<KeyValuePair<object, object>> GetEnumerator() => throw new NotImplementedException();
+            public bool Remove(object key) => throw new NotImplementedException();
+            public bool Remove(KeyValuePair<object, object> item) => throw new NotImplementedException();
+            public bool TryGetValue(object key, [MaybeNullWhen(false)] out object value) => throw new NotImplementedException();
+            IEnumerator IEnumerable.GetEnumerator() => throw new NotImplementedException();
+        }
+    }
+
+    class Person
+    {
+        public string Name { get; set; }
     }
 
     public class Customer
@@ -103,13 +182,13 @@ namespace ZeoDepJsonTests
         public Customer()
         {
             Id = Guid.NewGuid();
-           
+
         }
 
         public Guid Id { get; }
         public int Index { get; set; }
         public string Name { get; set; }
-        
+
         public Address[] Addresses { get; set; }
 
         public override string ToString() => Name;

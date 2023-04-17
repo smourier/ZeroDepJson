@@ -194,6 +194,17 @@
             true if the text was converted successfully; otherwise, false.
             </returns>
         </member>
+        <member name="T:ZeroDep.Json.IOptionsHolder">
+            <summary>
+            Defines an interface for setting or getting options.
+            </summary>
+        </member>
+        <member name="P:ZeroDep.Json.IOptionsHolder.Options">
+            <summary>
+            Gets or sets the options.
+            </summary>
+            <value>The options.</value>
+        </member>
         <member name="T:ZeroDep.Json.IMemberAccessor">
             <summary>
             Defines an interface for quick access to a type member.
@@ -543,6 +554,16 @@
             true if the value parameter was retrieved successfully; otherwise, false.
             </returns>
         </member>
+        <member name="T:ZeroDep.Json.ReferenceComparer">
+            <summary>
+            A utility class to compare object by their reference.
+            </summary>
+        </member>
+        <member name="F:ZeroDep.Json.ReferenceComparer.Instance">
+            <summary>
+            Gets the instance of the ReferenceComparer class.
+            </summary>
+        </member>
         <member name="T:ZeroDep.JsonOptions">
             <summary>
             Define options for JSON.
@@ -552,6 +573,14 @@
             <summary>
             Initializes a new instance of the <see cref="T:ZeroDep.JsonOptions" /> class.
             </summary>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.SerializationLevel">
+            <summary>
+            Gets a value indicating the current serialization level.
+            </summary>
+            <value>
+            The current serialization level.
+            </value>
         </member>
         <member name="P:ZeroDep.JsonOptions.ThrowExceptions">
             <summary>
@@ -705,6 +734,13 @@
             Gets or sets a callback that is called during deserialization, to deserialize a list object.
             </summary>
             <value>The callback.</value>
+        </member>
+        <member name="P:ZeroDep.JsonOptions.ObjectGraph">
+            <summary>
+            Gets or sets a utility class that will store an object graph to avoid serialization cycles.
+            If null, a Dictionary&lt;object, object&gt; using an object reference comparer will be used.
+            </summary>
+            <value>The object graph instance.</value>
         </member>
         <member name="M:ZeroDep.JsonOptions.AddException(System.Exception)">
             <summary>
