@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
 using NUnit.Framework;
 using ZeroDep;
@@ -51,6 +52,27 @@ namespace ZeoDepJsonTests
                 var customer = new Customer();
                 customer.Index = i;
                 list.Add(customer);
+
+                var address1 = new Address();
+                address1.ZipCode = 75000;
+                address1.City = new City();
+                address1.City.Name = "Paris";
+                address1.City.Country = new Country();
+                address1.City.Country.Name = "France";
+
+                var address2 = new Address();
+                address2.ZipCode = 10001;
+                address2.City = new City();
+                address2.City.Name = "New York";
+                address2.City.Country = new Country();
+                address2.City.Country.Name = "USA";
+
+                customer.Addresses = new[] { address1, address2 };
+
+                customer.GeoPoints = new List<GeoPoint> {
+                    new GeoPoint { Latitude = 48.34266, Longitude = 7.30574 },
+                    new GeoPoint { Latitude = 28.20042, Longitude = 15.99122 }
+                };
             }
 
             var json = Json.Serialize(list);
@@ -83,6 +105,11 @@ namespace ZeoDepJsonTests
                 address2.City.Country.Name = "USA";
 
                 customer.Addresses = new[] { address1, address2 };
+
+                customer.GeoPoints = new List<GeoPoint> {
+                    new GeoPoint { Latitude = 48.34266, Longitude = 7.30574 },
+                    new GeoPoint { Latitude = 28.20042, Longitude = 15.99122 }
+                };
 
                 dic[customer.Id] = customer;
             }
@@ -190,6 +217,7 @@ namespace ZeoDepJsonTests
         public string Name { get; set; }
 
         public Address[] Addresses { get; set; }
+        public IReadOnlyList<GeoPoint> GeoPoints { get; set; }
 
         public override string ToString() => Name;
     }
@@ -215,5 +243,13 @@ namespace ZeoDepJsonTests
         public string Name { get; set; }
 
         public override string ToString() => Name;
+    }
+
+    public class GeoPoint
+    {
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+
+        public override string ToString() => Latitude.ToString(CultureInfo.InvariantCulture) + "," + Longitude.ToString(CultureInfo.InvariantCulture);
     }
 }

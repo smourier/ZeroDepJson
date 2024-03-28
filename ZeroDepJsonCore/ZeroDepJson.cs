@@ -272,6 +272,21 @@ namespace ZeroDep
                     var elementType = type.GetElementType();
                     return Array.CreateInstance(elementType, elementsCount);
                 }
+
+                if (type.IsInterface)
+                {
+                    var elementType = GetGenericListElementType(type);
+                    if (elementType != null)
+                        return Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType));
+
+                    var elementTypes = GetGenericDictionaryElementType(type);
+                    if (elementTypes != null)
+                        return Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(elementTypes));
+
+                    elementType = GetListElementType(type);
+                    if (elementType != null)
+                        return new List<object>(elementsCount);
+                }
                 return Activator.CreateInstance(type);
             }
             catch (Exception e)
@@ -279,6 +294,57 @@ namespace ZeroDep
                 HandleException(new JsonException("JSO0001: JSON error detected. Cannot create an instance of the '" + type.Name + "' type.", e), options);
                 return null;
             }
+        }
+
+        private static Type GetGenericListElementType(Type type)
+        {
+            foreach (var iface in type.GetInterfaces())
+            {
+                if (!iface.IsGenericType)
+                    continue;
+
+                if (iface.GetGenericTypeDefinition() == typeof(IList<>))
+                    return iface.GetGenericArguments()[0];
+
+                if (iface.GetGenericTypeDefinition() == typeof(IReadOnlyList<>))
+                    return iface.GetGenericArguments()[0];
+
+                if (iface.GetGenericTypeDefinition() == typeof(ICollection<>))
+                    return iface.GetGenericArguments()[0];
+
+                if (iface.GetGenericTypeDefinition() == typeof(IReadOnlyCollection<>))
+                    return iface.GetGenericArguments()[0];
+            }
+            return null;
+        }
+
+        private static Type GetListElementType(Type type)
+        {
+            foreach (var iface in type.GetInterfaces())
+            {
+                if (!iface.IsGenericType)
+                    continue;
+
+                if (iface.GetGenericTypeDefinition() == typeof(IList))
+                    return iface.GetGenericArguments()[0];
+            }
+            return null;
+        }
+
+        private static Type[] GetGenericDictionaryElementType(Type type)
+        {
+            foreach (var iface in type.GetInterfaces())
+            {
+                if (!iface.IsGenericType)
+                    continue;
+
+                if (iface.GetGenericTypeDefinition() == typeof(IDictionary<,>))
+                    return iface.GetGenericArguments();
+
+                if (iface.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>))
+                    return iface.GetGenericArguments();
+            }
+            return null;
         }
 
         private static ListObject GetListObject(Type type, JsonOptions options, object target, object value, IDictionary dictionary, string key)
@@ -311,7 +377,8 @@ namespace ZeroDep
 
             if (type.IsGenericType)
             {
-                if (type.GetGenericTypeDefinition() == typeof(ICollection<>))
+                if (type.GetGenericTypeDefinition() == typeof(ICollection<>) ||
+                    type.GetGenericTypeDefinition() == typeof(IReadOnlyCollection<>))
                     return (ListObject)Activator.CreateInstance(typeof(ICollectionTObject<>).MakeGenericType(type.GetGenericArguments()[0]));
             }
 
@@ -320,7 +387,8 @@ namespace ZeroDep
                 if (!iface.IsGenericType)
                     continue;
 
-                if (iface.GetGenericTypeDefinition() == typeof(ICollection<>))
+                if (iface.GetGenericTypeDefinition() == typeof(ICollection<>) ||
+                    iface.GetGenericTypeDefinition() == typeof(IReadOnlyCollection<>))
                     return (ListObject)Activator.CreateInstance(typeof(ICollectionTObject<>).MakeGenericType(iface.GetGenericArguments()[0]));
             }
             return null;
@@ -681,7 +749,13 @@ namespace ZeroDep
                 if (iface.GetGenericTypeDefinition() == typeof(IList<>))
                     return iface.GetGenericArguments()[0];
 
+                if (iface.GetGenericTypeDefinition() == typeof(IReadOnlyList<>))
+                    return iface.GetGenericArguments()[0];
+
                 if (iface.GetGenericTypeDefinition() == typeof(ICollection<>))
+                    return iface.GetGenericArguments()[0];
+
+                if (iface.GetGenericTypeDefinition() == typeof(IReadOnlyCollection<>))
                     return iface.GetGenericArguments()[0];
 
                 if (iface.GetGenericTypeDefinition() == typeof(IEnumerable<>))
@@ -1710,12 +1784,8 @@ namespace ZeroDep
                     targetValue = Accessor.Get(target);
                 }
 
-                // sufficient array?
                 if (targetValue == null || (targetValue is Array array && array.GetLength(0) < elementsCount))
                 {
-                    if (Type.IsInterface)
-                        return null;
-
                     targetValue = CreateInstance(target, Type, elementsCount, options, targetValue);
                     if (targetValue != null)
                     {
