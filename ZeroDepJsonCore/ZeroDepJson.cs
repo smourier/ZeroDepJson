@@ -49,7 +49,10 @@ namespace ZeroDep
         private static readonly string[] _dateFormatsUtc = { "yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'", "yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'", "yyyy'-'MM'-'dd'T'HH':'mm'Z'", "yyyyMMdd'T'HH':'mm':'ss'Z'" };
         private static readonly DateTime _minDateTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         private static readonly long _minDateTimeTicks = _minDateTime.Ticks;
+
+#if !NET8_0_OR_GREATER
         private static readonly FormatterConverter _defaultFormatterConverter = new FormatterConverter();
+#endif
 
         /// <summary>
         /// Serializes the specified object. Supports anonymous and dynamic types.
@@ -1101,6 +1104,7 @@ namespace ZeroDep
             return sb.ToString();
         }
 
+#if !NET8_0_OR_GREATER
         private static ISerializable ReadSerializable(TextReader reader, JsonOptions options, string typeName, Dictionary<string, object> values)
         {
             Type type;
@@ -1133,6 +1137,7 @@ namespace ZeroDep
                 return null;
             }
         }
+#endif
 
         private static object ReadValue(TextReader reader, JsonOptions options) => ReadValue(reader, options, false, out var _);
         private static object ReadValue(TextReader reader, JsonOptions options, bool arrayMode, out bool arrayEnd)
@@ -1171,6 +1176,7 @@ namespace ZeroDep
             if (c == '{')
             {
                 var dic = ReadDictionary(reader, options);
+#if !NET8_0_OR_GREATER
                 if (options.SerializationOptions.HasFlag(JsonSerializationOptions.UseISerializable))
                 {
                     if (dic.TryGetValue(_serializationTypeToken, out var o))
@@ -1183,6 +1189,7 @@ namespace ZeroDep
                         }
                     }
                 }
+#endif
                 return dic;
             }
 
@@ -2535,6 +2542,7 @@ namespace ZeroDep
             writer.Write('}');
         }
 
+#if !NET8_0_OR_GREATER
         private static void WriteSerializable(TextWriter writer, ISerializable serializable, IDictionary<object, object> objectGraph, JsonOptions options)
         {
             var info = new SerializationInfo(serializable.GetType(), _defaultFormatterConverter);
@@ -2569,6 +2577,7 @@ namespace ZeroDep
         }
 
         private static bool ForceSerializable(object obj) => obj is Exception;
+#endif
 
         /// <summary>
         /// Writes an object to the JSON writer.
@@ -2589,12 +2598,14 @@ namespace ZeroDep
             objectGraph = objectGraph ?? options.FinalObjectGraph;
             SetOptions(objectGraph, options);
 
+#if !NET8_0_OR_GREATER
             ISerializable serializable = null;
             var useISerializable = options.SerializationOptions.HasFlag(JsonSerializationOptions.UseISerializable) || ForceSerializable(value);
             if (useISerializable)
             {
                 serializable = value as ISerializable;
             }
+#endif
 
             writer.Write('{');
 
@@ -2610,11 +2621,13 @@ namespace ZeroDep
             }
 
             var type = value.GetType();
+#if !NET8_0_OR_GREATER
             if (serializable != null)
             {
                 WriteSerializable(writer, serializable, objectGraph, options);
             }
             else
+#endif
             {
                 var def = TypeDef.Get(type, options);
                 def.WriteValues(writer, value, objectGraph, options);
@@ -5398,7 +5411,7 @@ namespace ZeroDep
         SerializeFields = 0x8,
 
         /// <summary>
-        /// Use the ISerializable interface.
+        /// Use the ISerializable interface. Supported only on .NET Framework or .NET Core 7 or lower only. On .NET Core 8, this has no effect.
         /// </summary>
         UseISerializable = 0x10,
 
@@ -5551,6 +5564,7 @@ namespace ZeroDep
         {
         }
 
+#if !NET8_0_OR_GREATER
         /// <summary>
         /// Initializes a new instance of the <see cref="JsonException"/> class.
         /// </summary>
@@ -5560,6 +5574,7 @@ namespace ZeroDep
             : base(info, context)
         {
         }
+#endif
 
         /// <summary>
         /// Gets the errror code.

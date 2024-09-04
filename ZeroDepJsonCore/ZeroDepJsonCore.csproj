@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
-		<TargetFramework>net6.0</TargetFramework>
+		<TargetFramework>net8.0</TargetFramework>
 		<Company>Simon Mourier</Company>
 		<Version>1.0.1</Version>
 		<Copyright>Copyright (c) 2021-2024 Simon Mourier. All rights reserved.</Copyright>

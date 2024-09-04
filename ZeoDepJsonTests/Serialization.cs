@@ -19,28 +19,28 @@ namespace ZeoDepJsonTests
         [Test]
         public void TestSimpleTypes()
         {
-            Assert.AreEqual("true", Json.Serialize(true));
-            Assert.AreEqual("false", Json.Serialize(false));
-            Assert.AreEqual("12345678", Json.Serialize(12345678));
-            Assert.AreEqual("12345678901234567890", Json.Serialize(12345678901234567890));
-            Assert.AreEqual("1234567890123456789.0123456789", Json.Serialize(1234567890123456789.01234567890m));
-            Assert.AreEqual("12345678", Json.Serialize((uint)12345678));
-            Assert.AreEqual("128", Json.Serialize((byte)128));
-            Assert.AreEqual("-56", Json.Serialize((sbyte)-56));
-            Assert.AreEqual("-56", Json.Serialize((short)-56));
-            Assert.AreEqual("12345", Json.Serialize((ushort)12345));
-            Assert.AreEqual("\"héllo world\"", Json.Serialize("héllo world"));
+            Assert.That("true", Is.EqualTo(Json.Serialize(true)));
+            Assert.That("false", Is.EqualTo(Json.Serialize(false)));
+            Assert.That("12345678", Is.EqualTo(Json.Serialize(12345678)));
+            Assert.That("12345678901234567890", Is.EqualTo(Json.Serialize(12345678901234567890)));
+            Assert.That("1234567890123456789.0123456789", Is.EqualTo(Json.Serialize(1234567890123456789.01234567890m)));
+            Assert.That("12345678", Is.EqualTo(Json.Serialize((uint)12345678)));
+            Assert.That("128", Is.EqualTo(Json.Serialize((byte)128)));
+            Assert.That("-56", Is.EqualTo(Json.Serialize((sbyte)-56)));
+            Assert.That("-56", Is.EqualTo(Json.Serialize((short)-56)));
+            Assert.That("12345", Is.EqualTo(Json.Serialize((ushort)12345)));
+            Assert.That("\"héllo world\"", Is.EqualTo(Json.Serialize("héllo world")));
             var ts = new TimeSpan(12, 34, 56, 7, 8);
-            Assert.AreEqual("11625670080000", Json.Serialize(ts));
-            Assert.AreEqual("\"13:10:56:07.008\"", Json.Serialize(ts, new JsonOptions { SerializationOptions = JsonSerializationOptions.TimeSpanAsText }));
+            Assert.That("11625670080000", Is.EqualTo(Json.Serialize(ts)));
+            Assert.That("\"13:10:56:07.008\"", Is.EqualTo(Json.Serialize(ts, new JsonOptions { SerializationOptions = JsonSerializationOptions.TimeSpanAsText })));
             var guid = Guid.NewGuid();
-            Assert.AreEqual("\"" + guid.ToString() + "\"", Json.Serialize(guid));
-            Assert.AreEqual("\"https://github.com/smourier/ZeroDepJson\"", Json.Serialize(new Uri("https://github.com/smourier/ZeroDepJson")));
-            Assert.AreEqual("2", Json.Serialize(UriKind.Relative));
-            Assert.AreEqual("\"Relative\"", Json.Serialize(UriKind.Relative, new JsonOptions { SerializationOptions = JsonSerializationOptions.EnumAsText }));
-            Assert.AreEqual("\"x\"", Json.Serialize('x'));
-            Assert.AreEqual("1234.5677", Json.Serialize(1234.5678f));
-            Assert.AreEqual("1234.5678", Json.Serialize(1234.5678d));
+            Assert.That("\"" + guid.ToString() + "\"", Is.EqualTo(Json.Serialize(guid)));
+            Assert.That("\"https://github.com/smourier/ZeroDepJson\"", Is.EqualTo(Json.Serialize(new Uri("https://github.com/smourier/ZeroDepJson"))));
+            Assert.That("2", Is.EqualTo(Json.Serialize(UriKind.Relative)));
+            Assert.That("\"Relative\"", Is.EqualTo(Json.Serialize(UriKind.Relative, new JsonOptions { SerializationOptions = JsonSerializationOptions.EnumAsText })));
+            Assert.That("\"x\"", Is.EqualTo(Json.Serialize('x')));
+            Assert.That("1234.5677", Is.EqualTo(Json.Serialize(1234.5678f)));
+            Assert.That("1234.5678", Is.EqualTo(Json.Serialize(1234.5678d)));
         }
 
         [Test]
@@ -78,7 +78,7 @@ namespace ZeoDepJsonTests
             var json = Json.Serialize(list);
             var list2 = Json.Deserialize<List<Customer>>(json);
             var json2 = Json.Serialize(list2);
-            Assert.AreEqual(json, json2);
+            Assert.That(json, Is.EqualTo(json2));
         }
 
         [Test]
@@ -117,13 +117,13 @@ namespace ZeoDepJsonTests
             var json1 = Json.Serialize(dic);
             var list2 = (Dictionary<string, object>)Json.Deserialize(json1);
             var json2 = Json.Serialize(list2);
-            Assert.AreEqual(json1, json2);
+            Assert.That(json1, Is.EqualTo(json2));
 
             var customers = list2.Values.Cast<Dictionary<string, object>>().ToList();
             var json3 = Json.Serialize(customers);
             var list3 = Json.Deserialize<List<Customer>>(json3);
             var json4 = Json.Serialize(list3);
-            Assert.AreEqual(json3, json4);
+            Assert.That(json3, Is.EqualTo(json4));
         }
 
         [Test]
@@ -138,7 +138,7 @@ namespace ZeoDepJsonTests
             }
             catch (JsonException ex)
             {
-                Assert.IsTrue(ex.Code == 9);
+                Assert.That(ex.Code, Is.EqualTo(9));
             }
         }
 
@@ -149,7 +149,7 @@ namespace ZeoDepJsonTests
             var persons = new Person[] { person, person };
             var options = new CustomOptions();
             var json = Json.Serialize(persons, options);
-            Assert.IsTrue(json == "[{\"Name\":\"héllo\"},{\"Name\":\"héllo\"}]");
+            Assert.That(json, Is.EqualTo("[{\"Name\":\"héllo\"},{\"Name\":\"héllo\"}]"));
         }
     }
 
