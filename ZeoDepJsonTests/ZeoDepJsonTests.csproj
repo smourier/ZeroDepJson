@@ -5,7 +5,7 @@
 		<IsPackable>false</IsPackable>
 		<Company>Simon Mourier</Company>
 		<Version>1.0.1</Version>
-		<Copyright>Copyright (c) 2021-2024 Simon Mourier. All rights reserved.</Copyright>
+		<Copyright>Copyright (c) 2021-2025 Simon Mourier. All rights reserved.</Copyright>
 		<PackageProjectUrl>https://github.com/smourier/ZeroDepJson</PackageProjectUrl>
 		<PackageTags>json</PackageTags>
 		<AssemblyVersion>1.0.1</AssemblyVersion>
