@@ -4,16 +4,16 @@
 		<OutputType>Exe</OutputType>
 		<TargetFramework>net10.0</TargetFramework>
 		<Company>Simon Mourier</Company>
-		<Version>1.0.1</Version>
+		<Version>1.1.0</Version>
 		<Copyright>Copyright (c) 2021-2026 Simon Mourier. All rights reserved.</Copyright>
 		<PackageProjectUrl>https://github.com/smourier/ZeroDepJson</PackageProjectUrl>
 		<PackageTags>json</PackageTags>
-		<AssemblyVersion>1.0.1</AssemblyVersion>
-		<FileVersion>1.0.1</FileVersion>
+		<AssemblyVersion>1.1.0</AssemblyVersion>
+		<FileVersion>1.1.0</FileVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-		<DocumentationFile>D:\SimonMourier\GitHub\ZeroDepJson\ZeroDepJsonCore\ZeroDepJsonCore.xml</DocumentationFile>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 	</PropertyGroup>
 
 </Project>

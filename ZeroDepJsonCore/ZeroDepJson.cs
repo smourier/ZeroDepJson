@@ -9,7 +9,6 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
-using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Serialization;
 
@@ -21,6 +20,7 @@ using System.Xml.Serialization;
 #pragma warning disable IDE0054 // Use compound assignment
 #pragma warning disable CA1031 // Do not catch general exception types
 #pragma warning disable CA1034 // Nested types should not be visible
+#pragma warning disable IDE0130 // Namespace does not match folder structure
 
 namespace ZeroDep
 {
@@ -29,6 +29,8 @@ namespace ZeroDep
     /// </summary>
     public static class Json
     {
+        private const int _decimalRadix = 10;
+        private const int _numberBufferLength = 64;
         private const string _null = "null";
         private const string _true = "true";
         private const string _false = "false";
@@ -120,10 +122,10 @@ namespace ZeroDep
                 if (!targetType.IsValueType)
                     return null;
 
-                return CreateInstance(null, targetType, 0, options, text);
+                return CreateInstance(null, targetType, 0, options ?? new JsonOptions(), text);
             }
 
-            using (var reader = new StringReader(text))
+            using (var reader = new TypedTextReader(text))
             {
                 return Deserialize(reader, targetType, options);
             }
@@ -167,9 +169,12 @@ namespace ZeroDep
 
             options = options ?? new JsonOptions();
             if (targetType == null || targetType == typeof(object))
-                return ReadValue(reader, options);
+                return ReadDocument(reader, options);
 
-            var value = ReadValue(reader, options);
+            if (CanReadTyped(options))
+                return ReadTypedDocument(reader, targetType, options);
+
+            var value = ReadDocument(reader, options);
             if (value == null)
             {
                 if (targetType.IsValueType)
@@ -212,7 +217,8 @@ namespace ZeroDep
             if (target == null)
                 throw new ArgumentNullException(nameof(target));
 
-            var value = ReadValue(reader, options);
+            options = options ?? new JsonOptions();
+            var value = ReadDocument(reader, options);
             Apply(value, target, options);
         }
 
@@ -278,13 +284,13 @@ namespace ZeroDep
 
                 if (type.IsInterface)
                 {
-                    var elementType = GetGenericListElementType(type);
-                    if (elementType != null)
-                        return Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType));
-
                     var elementTypes = GetGenericDictionaryElementType(type);
                     if (elementTypes != null)
                         return Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(elementTypes));
+
+                    var elementType = GetGenericListElementType(type);
+                    if (elementType != null)
+                        return Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType));
 
                     elementType = GetListElementType(type);
                     if (elementType != null)
@@ -301,52 +307,46 @@ namespace ZeroDep
 
         private static Type GetGenericListElementType(Type type)
         {
+            if (type.IsGenericType)
+            {
+                var definition = type.GetGenericTypeDefinition();
+                if (definition == typeof(IList<>) || definition == typeof(IReadOnlyList<>) ||
+                    definition == typeof(ICollection<>) || definition == typeof(IReadOnlyCollection<>) ||
+                    definition == typeof(IEnumerable<>))
+                    return type.GetGenericArguments()[0];
+            }
+
             foreach (var iface in type.GetInterfaces())
             {
-                if (!iface.IsGenericType)
-                    continue;
-
-                if (iface.GetGenericTypeDefinition() == typeof(IList<>))
-                    return iface.GetGenericArguments()[0];
-
-                if (iface.GetGenericTypeDefinition() == typeof(IReadOnlyList<>))
-                    return iface.GetGenericArguments()[0];
-
-                if (iface.GetGenericTypeDefinition() == typeof(ICollection<>))
-                    return iface.GetGenericArguments()[0];
-
-                if (iface.GetGenericTypeDefinition() == typeof(IReadOnlyCollection<>))
-                    return iface.GetGenericArguments()[0];
+                var elementType = GetGenericListElementType(iface);
+                if (elementType != null)
+                    return elementType;
             }
+
             return null;
         }
 
         private static Type GetListElementType(Type type)
         {
-            foreach (var iface in type.GetInterfaces())
-            {
-                if (!iface.IsGenericType)
-                    continue;
-
-                if (iface.GetGenericTypeDefinition() == typeof(IList))
-                    return iface.GetGenericArguments()[0];
-            }
-            return null;
+            return typeof(IList).IsAssignableFrom(type) ? typeof(object) : null;
         }
 
         private static Type[] GetGenericDictionaryElementType(Type type)
         {
+            if (type.IsGenericType)
+            {
+                var definition = type.GetGenericTypeDefinition();
+                if (definition == typeof(IDictionary<,>) || definition == typeof(IReadOnlyDictionary<,>))
+                    return type.GetGenericArguments();
+            }
+
             foreach (var iface in type.GetInterfaces())
             {
-                if (!iface.IsGenericType)
-                    continue;
-
-                if (iface.GetGenericTypeDefinition() == typeof(IDictionary<,>))
-                    return iface.GetGenericArguments();
-
-                if (iface.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>))
-                    return iface.GetGenericArguments();
+                var elementTypes = GetGenericDictionaryElementType(iface);
+                if (elementTypes != null)
+                    return elementTypes;
             }
+
             return null;
         }
 
@@ -372,8 +372,11 @@ namespace ZeroDep
                 }
             }
 
-            if (type == typeof(byte[]))
+            if (type == typeof(byte[]) || type.IsPrimitive || type.IsEnum)
                 return null;
+
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                return new IListObject();
 
             if (typeof(IList).IsAssignableFrom(type))
                 return new IListObject(); // also handles arrays
@@ -506,17 +509,20 @@ namespace ZeroDep
                 return;
 
             var elementType = target.GetType().GetElementType();
-            var i = 0;
+            var i = target.GetLowerBound(0);
             if (input != null)
             {
                 foreach (var value in input)
                 {
+                    if (i > target.GetUpperBound(0))
+                        break;
+
                     target.SetValue(ChangeType(target, value, elementType, options), i++);
                 }
             }
             else
             {
-                Array.Clear(target, 0, target.Length);
+                Array.Clear(target, target.GetLowerBound(0), target.Length);
             }
         }
 
@@ -661,7 +667,9 @@ namespace ZeroDep
 
             if (target is IDictionary dicTarget)
             {
-                var itemType = GetItemType(dicTarget.GetType());
+                var elementTypes = GetGenericDictionaryElementType(dicTarget.GetType());
+                var keyType = elementTypes == null ? typeof(object) : elementTypes[0];
+                var itemType = elementTypes == null ? typeof(object) : elementTypes[1];
                 foreach (DictionaryEntry entry in dictionary)
                 {
                     if (entry.Key == null)
@@ -669,13 +677,14 @@ namespace ZeroDep
 
                     if (itemType == typeof(object))
                     {
-                        dicTarget[entry.Key] = entry.Value;
+                        dicTarget[ChangeType(target, entry.Key, keyType, options)] = entry.Value;
                     }
                     else
                     {
-                        dicTarget[entry.Key] = ChangeType(target, entry.Value, itemType, options);
+                        dicTarget[ChangeType(target, entry.Key, keyType, options)] = ChangeType(target, entry.Value, itemType, options);
                     }
                 }
+
                 return;
             }
 
@@ -741,30 +750,14 @@ namespace ZeroDep
             if (collectionType == null)
                 throw new ArgumentNullException(nameof(collectionType));
 
-            foreach (var iface in collectionType.GetInterfaces())
-            {
-                if (!iface.IsGenericType)
-                    continue;
+            if (collectionType.IsArray)
+                return collectionType.GetElementType();
 
-                if (iface.GetGenericTypeDefinition() == typeof(IDictionary<,>))
-                    return iface.GetGenericArguments()[1];
+            var dictionaryTypes = GetGenericDictionaryElementType(collectionType);
+            if (dictionaryTypes != null)
+                return dictionaryTypes[1];
 
-                if (iface.GetGenericTypeDefinition() == typeof(IList<>))
-                    return iface.GetGenericArguments()[0];
-
-                if (iface.GetGenericTypeDefinition() == typeof(IReadOnlyList<>))
-                    return iface.GetGenericArguments()[0];
-
-                if (iface.GetGenericTypeDefinition() == typeof(ICollection<>))
-                    return iface.GetGenericArguments()[0];
-
-                if (iface.GetGenericTypeDefinition() == typeof(IReadOnlyCollection<>))
-                    return iface.GetGenericArguments()[0];
-
-                if (iface.GetGenericTypeDefinition() == typeof(IEnumerable<>))
-                    return iface.GetGenericArguments()[0];
-            }
-            return typeof(object);
+            return GetGenericListElementType(collectionType) ?? typeof(object);
         }
 
         /// <summary>
@@ -799,7 +792,7 @@ namespace ZeroDep
                 return value;
 
             options = options ?? new JsonOptions();
-            if (!(value is string))
+            if (!(value is string) && !(value is IDictionary))
             {
                 if (conversionType.IsArray)
                 {
@@ -815,8 +808,12 @@ namespace ZeroDep
                         var array = Array.CreateInstance(elementType, list.Count);
                         if (array != null)
                         {
-                            Array.Copy(list.ToArray(), array, list.Count);
+                            for (var index = 0; index < list.Count; index++)
+                            {
+                                array.SetValue(list[index], index);
+                            }
                         }
+
                         return array;
                     }
                 }
@@ -887,29 +884,33 @@ namespace ZeroDep
 
         private static object[] ReadArray(TextReader reader, JsonOptions options)
         {
-            if (!ReadWhitespaces(reader))
-                return null;
-
             reader.Read();
             var list = new List<object>();
-            do
+            if (ReadWhitespaces(reader) && reader.Peek() == ']')
             {
-                var value = ReadValue(reader, options, true, out var arrayEnd);
-                if (!Convert.IsDBNull(value))
-                {
-                    list.Add(value);
-                }
-                if (arrayEnd)
-                    return list.ToArray();
-
-                if (reader.Peek() < 0)
-                {
-                    HandleException(GetExpectedCharacterException(GetPosition(reader), ']'), options);
-                    return list.ToArray();
-                }
-
+                reader.Read();
+                return list.ToArray();
             }
-            while (true);
+
+            while (true)
+            {
+                list.Add(ReadValue(reader, options));
+                if (!ReadWhitespaces(reader))
+                {
+                    HandleException(GetEofException(']'), options);
+                    return list.ToArray();
+                }
+
+                var c = (char)reader.Read();
+                if (c == ']')
+                    return list.ToArray();
+
+                if (c != ',')
+                {
+                    HandleException(GetExpectedCharacterException(GetPosition(reader), ','), options);
+                    return list.ToArray();
+                }
+            }
         }
 
         private static JsonException GetExpectedCharacterException(long pos, char c)
@@ -951,6 +952,9 @@ namespace ZeroDep
             if (reader == null)
                 return -1;
 
+            if (reader is TypedTextReader typedReader)
+                return typedReader.Position;
+
             if (reader is StreamReader sr && sr.BaseStream != null)
             {
                 try
@@ -974,64 +978,62 @@ namespace ZeroDep
 
         private static Dictionary<string, object> ReadDictionary(TextReader reader, JsonOptions options)
         {
-            if (!ReadWhitespaces(reader))
-                return null;
-
             reader.Read();
             var dictionary = new Dictionary<string, object>();
-            do
+            if (ReadWhitespaces(reader) && reader.Peek() == '}')
             {
-                var i = reader.Peek();
-                if (i < 0)
+                reader.Read();
+                return dictionary;
+            }
+
+            while (true)
+            {
+                if (!ReadWhitespaces(reader))
+                {
+                    HandleException(GetEofException('"'), options);
+                    return dictionary;
+                }
+
+                if (reader.Read() != '"')
+                {
+                    HandleException(GetExpectedCharacterException(GetPosition(reader), '"'), options);
+                    return dictionary;
+                }
+
+                var text = ReadString(reader, options);
+                if (text == null)
+                    return dictionary;
+
+                if (!ReadWhitespaces(reader) || reader.Read() != ':')
+                {
+                    HandleException(GetExpectedCharacterException(GetPosition(reader), ':'), options);
+                    return dictionary;
+                }
+
+                dictionary[text] = ReadValue(reader, options);
+                if (!ReadWhitespaces(reader))
                 {
                     HandleException(GetEofException('}'), options);
                     return dictionary;
                 }
 
                 var c = (char)reader.Read();
-                switch (c)
+                if (c == '}')
+                    return dictionary;
+
+                if (c != ',')
                 {
-                    case '}':
-                        return dictionary;
-
-                    case '"':
-                        var text = ReadString(reader, options);
-                        if (!ReadWhitespaces(reader))
-                        {
-                            HandleException(GetExpectedCharacterException(GetPosition(reader), ':'), options);
-                            return dictionary;
-                        }
-
-                        c = (char)reader.Peek();
-                        if (c != ':')
-                        {
-                            HandleException(GetExpectedCharacterException(GetPosition(reader), ':'), options);
-                            return dictionary;
-                        }
-
-                        reader.Read();
-                        dictionary[text] = ReadValue(reader, options);
-                        break;
-
-                    case ',':
-                        break;
-
-                    case '\r':
-                    case '\n':
-                    case '\t':
-                    case ' ':
-                        break;
-
-                    default:
-                        HandleException(GetUnexpectedCharacterException(GetPosition(reader), c), options);
-                        return dictionary;
+                    HandleException(GetExpectedCharacterException(GetPosition(reader), ','), options);
+                    return dictionary;
                 }
             }
-            while (true);
         }
 
-        private static string ReadString(TextReader reader, JsonOptions options)
+        private static string ReadString(TextReader reader, JsonOptions options, TypeDef definition = null)
         {
+            if (reader is TypedTextReader typedReader && typedReader.TryReadString(definition, out var text))
+                return text;
+
             var sb = new StringBuilder();
             do
             {
@@ -1084,19 +1086,24 @@ namespace ZeroDep
                             sb.Append(next);
                             break;
 
-                        case 'u': // unicode
+                        case 'u':
                             var us = ReadX4(reader, options);
                             sb.Append((char)us);
                             break;
 
                         default:
-                            sb.Append(c);
-                            sb.Append(next);
-                            break;
+                            HandleException(GetUnexpectedCharacterException(GetPosition(reader), next), options);
+                            return null;
                     }
                 }
                 else
                 {
+                    if (c < ' ')
+                    {
+                        HandleException(GetUnexpectedCharacterException(GetPosition(reader), c), options);
+                        return null;
+                    }
+
                     sb.Append(c);
                 }
             }
@@ -1139,192 +1146,897 @@ namespace ZeroDep
         }
 #endif
 
-        private static object ReadValue(TextReader reader, JsonOptions options) => ReadValue(reader, options, false, out var _);
-        private static object ReadValue(TextReader reader, JsonOptions options, bool arrayMode, out bool arrayEnd)
+        private static bool CanReadTyped(JsonOptions options)
         {
-            arrayEnd = false;
-            // 1st chance type is determined by format
-            int i;
+            return options.GetType() == typeof(JsonOptions) && options.ThrowExceptions &&
+                options.CreateInstanceCallback == null && options.MapEntryCallback == null &&
+                options.ApplyEntryCallback == null && options.GetListObjectCallback == null &&
+                !options.SerializationOptions.HasFlag(JsonSerializationOptions.UseISerializable);
+        }
+
+        private static object ReadTypedDocument(TextReader reader, Type type, JsonOptions options)
+        {
+            var typedReader = reader as TypedTextReader ?? new TypedTextReader(reader);
+            object value;
+            try
+            {
+                value = TypedReader.Get(type).Read(typedReader, options, null);
+            }
+            catch (DuplicateTypedMemberException)
+            {
+                typedReader.Reset();
+                value = ReadDocument(typedReader, options);
+                return value == null ? null : ChangeType(value, type, options);
+            }
+
+            if (ReadWhitespaces(typedReader))
+            {
+                HandleException(GetUnexpectedCharacterException(GetPosition(typedReader), (char)typedReader.Peek()), options);
+            }
+
+            return value;
+        }
+
+        private sealed class TypedTextReader : TextReader
+        {
+            private readonly string _text;
+            private readonly TextReader _reader;
+            private readonly StringBuilder _buffer;
+            private int _position;
+
+            public TypedTextReader(string text)
+            {
+                _text = text;
+            }
+
+            public TypedTextReader(TextReader reader)
+            {
+                _reader = reader;
+                _buffer = new StringBuilder();
+            }
+
+            public int Position => _position;
+
+            public bool TryReadString(TypeDef definition, out string value)
+            {
+                if (_text != null)
+                {
+                    var start = _position;
+                    for (var index = start; index < _text.Length; index++)
+                    {
+                        var c = _text[index];
+                        if (c == '\\' || c < ' ')
+                            break;
+
+                        if (c == '"')
+                        {
+                            _position = index + 1;
+                            var length = index - start;
+                            value = definition == null ? null : definition.GetWireName(_text, start, length);
+                            value = value ?? _text.Substring(start, length);
+                            return true;
+                        }
+                    }
+                }
+
+                value = null;
+                return false;
+            }
+
+            public override int Peek()
+            {
+                if (_text != null)
+                    return _position < _text.Length ? _text[_position] : -1;
+
+                return _position < _buffer.Length ? _buffer[_position] : _reader.Peek();
+            }
+
+            public override int Read()
+            {
+                if (_text != null)
+                    return _position < _text.Length ? _text[_position++] : -1;
+
+                if (_position < _buffer.Length)
+                    return _buffer[_position++];
+
+                var value = _reader.Read();
+                if (value >= 0)
+                {
+                    _buffer.Append((char)value);
+                    _position++;
+                }
+
+                return value;
+            }
+
+            public void Reset()
+            {
+                _position = 0;
+            }
+        }
+
+        private sealed class DuplicateTypedMemberException : Exception
+        {
+        }
+
+        private struct TypedMemberNames
+        {
+            private string _first;
+            private string _second;
+            private HashSet<string> _remaining;
+
+            public bool Add(string name)
+            {
+                if (_first == null)
+                {
+                    _first = name;
+                    return true;
+                }
+
+                if (_first == name || _second == name)
+                    return false;
+
+                if (_second == null)
+                {
+                    _second = name;
+                    return true;
+                }
+
+                if (_remaining == null)
+                {
+                    _remaining = new HashSet<string>(StringComparer.Ordinal);
+                }
+
+                return _remaining.Add(name);
+            }
+        }
+
+        private static bool ReadContainerNext(TextReader reader, char end, JsonOptions options)
+        {
+            if (!ReadWhitespaces(reader))
+            {
+                HandleException(GetEofException(end), options);
+                return false;
+            }
+
+            var c = (char)reader.Read();
+            if (c == end)
+                return false;
+
+            if (c != ',')
+            {
+                HandleException(GetExpectedCharacterException(GetPosition(reader), ','), options);
+                return false;
+            }
+
+            return true;
+        }
+
+        private static string ReadMemberName(TextReader reader, JsonOptions options, TypeDef definition = null)
+        {
+            if (!ReadWhitespaces(reader))
+            {
+                HandleException(GetEofException('"'), options);
+                return null;
+            }
+
+            if (reader.Read() != '"')
+            {
+                HandleException(GetExpectedCharacterException(GetPosition(reader), '"'), options);
+                return null;
+            }
+
+            var name = ReadString(reader, options, definition);
+            if (!ReadWhitespaces(reader) || reader.Read() != ':')
+            {
+                HandleException(GetExpectedCharacterException(GetPosition(reader), ':'), options);
+                return null;
+            }
+
+            return name;
+        }
+
+        private static void SkipValue(TextReader reader, JsonOptions options)
+        {
+            if (!ReadWhitespaces(reader))
+            {
+                HandleException(GetEofException('"'), options);
+                return;
+            }
+
+            var c = (char)reader.Peek();
+            if (c != '[' && c != '{')
+            {
+                ReadValue(reader, options);
+                return;
+            }
+
+            reader.Read();
+            var end = c == '[' ? ']' : '}';
+            if (ReadWhitespaces(reader) && reader.Peek() == end)
+            {
+                reader.Read();
+                return;
+            }
+
             do
             {
-                i = reader.Peek();
-                if (i < 0)
-                    return null;
+                if (c == '{')
+                {
+                    ReadMemberName(reader, options);
+                }
 
-                if (i == 10 || i == 13 || i == 9 || i == 32)
+                SkipValue(reader, options);
+            }
+            while (ReadContainerNext(reader, end, options));
+        }
+
+        private static int ReadInt32(TextReader reader, JsonOptions options)
+        {
+            var c = reader.Peek();
+            if (c != '-' && (c < '0' || c > '9'))
+                return (int)ChangeType(ReadValue(reader, options), typeof(int), options);
+
+            var negative = c == '-';
+            if (negative)
+            {
+                reader.Read();
+            }
+
+            var first = reader.Peek();
+            var digits = 0;
+            uint magnitude = 0;
+            var limit = negative ? (uint)int.MaxValue + 1 : int.MaxValue;
+            StringBuilder builder = null;
+            while ((c = reader.Peek()) >= 0 && c != ',' && c != ']' && c != '}' && !IsJsonWhitespace((char)c))
+            {
+                if (builder == null && c >= '0' && c <= '9' && magnitude <= (limit - (uint)(c - '0')) / _decimalRadix)
+                {
+                    magnitude = magnitude * _decimalRadix + (uint)(c - '0');
+                    digits++;
+                    reader.Read();
+                    continue;
+                }
+
+                if (builder == null)
+                {
+                    builder = new StringBuilder();
+                    if (negative)
+                    {
+                        builder.Append('-');
+                    }
+
+                    if (digits > 0)
+                    {
+                        builder.Append(magnitude.ToString(CultureInfo.InvariantCulture));
+                    }
+                }
+
+                builder.Append((char)reader.Read());
+            }
+
+            if ((first == '0' && digits > 1) || (digits == 0 && builder == null))
+            {
+                HandleException(GetUnexpectedCharacterException(GetPosition(reader), (char)first), options);
+                return 0;
+            }
+
+            if (builder != null)
+                return (int)ChangeType(ParseNumberOrLiteral(builder.ToString(), reader, options), typeof(int), options);
+
+            return negative ? unchecked(-(int)magnitude) : (int)magnitude;
+        }
+
+        private static bool ReadBoolean(TextReader reader, JsonOptions options)
+        {
+            var c = reader.Peek();
+            if (c != 't' && c != 'f')
+                return (bool)ChangeType(ReadValue(reader, options), typeof(bool), options);
+
+            var text = c == 't' ? _true : _false;
+            foreach (var expected in text)
+            {
+                if (reader.Read() != expected)
+                {
+                    HandleException(GetUnexpectedCharacterException(GetPosition(reader), (char)c), options);
+                    return false;
+                }
+            }
+
+            c = reader.Peek();
+            if (c >= 0 && c != ',' && c != ']' && c != '}' && !IsJsonWhitespace((char)c))
+            {
+                HandleException(GetUnexpectedCharacterException(GetPosition(reader), (char)c), options);
+            }
+
+            return text == _true;
+        }
+
+        private static string ReadText(TextReader reader, JsonOptions options)
+        {
+            var value = ReadValue(reader, options);
+            return value is string text ? text : (string)ChangeType(value, typeof(string), options);
+        }
+
+        private static decimal ReadDecimal(TextReader reader, JsonOptions options)
+        {
+#if NET8_0_OR_GREATER
+            var c = reader.Peek();
+            if (c == '-' || (c >= '0' && c <= '9'))
+            {
+                Span<char> buffer = stackalloc char[_numberBufferLength];
+                var length = 0;
+                while ((c = reader.Peek()) >= 0 && c != ',' && c != ']' && c != '}' && !IsJsonWhitespace((char)c))
+                {
+                    if (length == buffer.Length)
+                    {
+                        var builder = new StringBuilder();
+                        builder.Append(buffer);
+                        do
+                        {
+                            builder.Append((char)reader.Read());
+                            c = reader.Peek();
+                        }
+                        while (c >= 0 && c != ',' && c != ']' && c != '}' && !IsJsonWhitespace((char)c));
+
+                        return (decimal)ChangeType(ParseNumberOrLiteral(builder.ToString(), reader, options), typeof(decimal), options);
+                    }
+
+                    buffer[length++] = (char)reader.Read();
+                }
+
+                var text = buffer.Slice(0, length);
+                if (IsJsonNumber(text) && text.IndexOfAny('e', 'E') < 0 &&
+                    decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedNumber))
+                    return text.IndexOf('.') < 0 && parsedNumber == 0 ? decimal.Zero : parsedNumber;
+
+                return (decimal)ChangeType(ParseNumberOrLiteral(text.ToString(), reader, options), typeof(decimal), options);
+            }
+#endif
+
+            var value = ReadValue(reader, options);
+            return value is decimal number ? number : (decimal)ChangeType(value, typeof(decimal), options);
+        }
+
+        private delegate T TypedReadCallback<T>(TextReader reader, JsonOptions options, object target);
+
+        private abstract class TypedReader
+        {
+            private static readonly Dictionary<Type, TypedReader> _readers = new Dictionary<Type, TypedReader>();
+            private static readonly object _lock = new object();
+
+            public abstract object Read(TextReader reader, JsonOptions options, object target);
+            public abstract bool CanPopulate(char c, JsonOptions options);
+
+            public static TypedReader Get(Type type)
+            {
+                lock (_lock)
+                {
+                    if (!_readers.TryGetValue(type, out var value))
+                    {
+                        value = (TypedReader)Activator.CreateInstance(typeof(TypedReader<>).MakeGenericType(type));
+                        _readers.Add(type, value);
+                    }
+
+                    return value;
+                }
+            }
+        }
+
+        private sealed class TypedReader<T> : TypedReader
+        {
+            private readonly TypedReadCallback<T> _read;
+            private readonly TypedContainerReader _container;
+            private readonly bool _isDictionary;
+            private volatile TypedDefinition _definition;
+
+            public TypedReader()
+            {
+                var type = typeof(T);
+                _read = ReadCore;
+                if (type == typeof(int))
+                {
+                    _read = (TypedReadCallback<T>)(object)new TypedReadCallback<int>((reader, options, target) => ReadInt32(reader, options));
+                    return;
+                }
+
+                if (type == typeof(bool))
+                {
+                    _read = (TypedReadCallback<T>)(object)new TypedReadCallback<bool>((reader, options, target) => ReadBoolean(reader, options));
+                    return;
+                }
+
+                var dictionaryTypes = GetGenericDictionaryElementType(type);
+                if (type == typeof(string))
+                {
+                    _read = (TypedReadCallback<T>)(object)new TypedReadCallback<string>((reader, options, target) => ReadText(reader, options));
+                    return;
+                }
+
+                if (type == typeof(decimal))
+                {
+                    _read = (TypedReadCallback<T>)(object)new TypedReadCallback<decimal>((reader, options, target) => ReadDecimal(reader, options));
+                    return;
+                }
+
+                _isDictionary = dictionaryTypes != null || typeof(IDictionary).IsAssignableFrom(type);
+                if (dictionaryTypes != null && (type.IsInterface || typeof(IDictionary).IsAssignableFrom(type)))
+                {
+                    _container = (TypedContainerReader)Activator.CreateInstance(
+                        typeof(TypedDictionaryReader<,>).MakeGenericType(dictionaryTypes), type);
+                }
+                else if (!_isDictionary)
+                {
+                    var elementType = type.IsArray ? type.GetElementType() : GetGenericListElementType(type);
+                    if (elementType != null && (type.IsArray ? type == elementType.MakeArrayType() :
+                        type.IsInterface || typeof(ICollection<>).MakeGenericType(elementType).IsAssignableFrom(type)))
+                    {
+                        _container = (TypedContainerReader)Activator.CreateInstance(
+                            typeof(TypedCollectionReader<>).MakeGenericType(elementType), type);
+                    }
+                }
+            }
+
+            public override object Read(TextReader reader, JsonOptions options, object target) => ReadTyped(reader, options, target);
+
+            public override bool CanPopulate(char c, JsonOptions options)
+            {
+                var type = typeof(T);
+                if (_container != null && ((_isDictionary && c == '{') || (!_isDictionary && c == '[')))
+                    return true;
+
+                return c == '{' && !_isDictionary && type != typeof(object) && type != typeof(string) &&
+                    !type.IsValueType && !type.IsInterface && !type.IsAbstract && GetDefinition(options).CanReadTyped();
+            }
+
+            public T ReadTyped(TextReader reader, JsonOptions options, object target)
+            {
+                if (!ReadWhitespaces(reader))
+                {
+                    HandleException(GetEofException('"'), options);
+                    return default(T);
+                }
+
+                return _read(reader, options, target);
+            }
+
+            private T ReadCore(TextReader reader, JsonOptions options, object target)
+            {
+                var type = typeof(T);
+                if (type == typeof(object))
+                    return (T)ReadValue(reader, options);
+
+                var c = reader.Peek();
+                if (_container != null && ((_isDictionary && c == '{') || (!_isDictionary && c == '[')))
+                    return (T)_container.Read(reader, options, target);
+
+                if (c == '{' && !_isDictionary && !type.IsValueType && !type.IsInterface && !type.IsAbstract)
+                {
+                    var definition = GetDefinition(options);
+                    if (definition.CanReadTyped())
+                        return (T)definition.ReadObject(reader, options, target);
+                }
+
+                return (T)ChangeType(ReadValue(reader, options), type, options);
+            }
+
+            private TypeDef GetDefinition(JsonOptions options)
+            {
+                var definition = _definition;
+                if (definition == null || definition.Options != options.SerializationOptions)
+                {
+                    definition = new TypedDefinition(options.SerializationOptions, TypeDef.Get(typeof(T), options));
+                    _definition = definition;
+                }
+
+                return definition.Definition;
+            }
+        }
+
+        private sealed class TypedDefinition
+        {
+            public TypedDefinition(JsonSerializationOptions options, TypeDef definition)
+            {
+                Options = options;
+                Definition = definition;
+            }
+
+            public JsonSerializationOptions Options { get; }
+            public TypeDef Definition { get; }
+        }
+
+        private abstract class TypedContainerReader
+        {
+            public abstract object Read(TextReader reader, JsonOptions options, object target);
+        }
+
+        private sealed class TypedCollectionReader<T> : TypedContainerReader
+        {
+            private readonly Type _type;
+            private readonly bool _isArray;
+            private volatile TypedReader<T> _itemReader;
+
+            public TypedCollectionReader(Type type)
+            {
+                _type = type;
+                _isArray = type.IsArray;
+            }
+
+            public override object Read(TextReader reader, JsonOptions options, object target)
+            {
+                var arrayValues = new TypedArrayBuilder<T>();
+                var result = _isArray ? null : target ?? CreateInstance(null, _type, 0, options, null);
+                var collection = result as ICollection<T>;
+                if (!_isArray && collection == null)
+                    return ChangeType(ReadValue(reader, options), _type, options);
+
+                var itemReader = _itemReader;
+                if (itemReader == null)
+                {
+                    itemReader = (TypedReader<T>)TypedReader.Get(typeof(T));
+                    _itemReader = itemReader;
+                }
+
+                var nullableCollection = !_isArray && !(result is IList) && Nullable.GetUnderlyingType(typeof(T)) != null ?
+                    new ICollectionTObject<T> { List = result } : null;
+                reader.Read();
+                if (ReadWhitespaces(reader) && reader.Peek() == ']')
                 {
                     reader.Read();
                 }
                 else
-                    break;
-            }
-            while (true);
+                {
+                    do
+                    {
+                        var value = itemReader.ReadTyped(reader, options, null);
+                        if (_isArray)
+                        {
+                            arrayValues.Add(value);
+                        }
+                        else if (nullableCollection == null)
+                        {
+                            collection.Add(value);
+                        }
+                        else
+                        {
+                            nullableCollection.Add(value, options);
+                        }
+                    }
+                    while (ReadContainerNext(reader, ']', options));
+                }
 
-            var c = (char)i;
+                if (!_isArray)
+                    return result;
+
+                return arrayValues.ToArray(target as T[]);
+            }
+        }
+
+        // small member arrays fit inline, avoiding a growth buffer before the final array.
+        private struct TypedArrayBuilder<T>
+        {
+            private const int _inlineCapacity = 4;
+            private T _first;
+            private T _second;
+            private T _third;
+            private T _fourth;
+            private int _count;
+            private List<T> _values;
+
+            public void Add(T value)
+            {
+                switch (_count)
+                {
+                    case 0:
+                        _first = value;
+                        break;
+
+                    case 1:
+                        _second = value;
+                        break;
+
+                    case 2:
+                        _third = value;
+                        break;
+
+                    case 3:
+                        _fourth = value;
+                        break;
+
+                    default:
+                        if (_values == null)
+                        {
+                            _values = new List<T>(_inlineCapacity * 2) { _first, _second, _third, _fourth };
+                        }
+
+                        _values.Add(value);
+                        break;
+                }
+
+                _count++;
+            }
+
+            public T[] ToArray(T[] target)
+            {
+                if (_count == 0)
+                    return target ?? Array.Empty<T>();
+
+                var array = target != null && target.Length >= _count ? target : new T[_count];
+                if (_values != null)
+                {
+                    _values.CopyTo(array);
+                    return array;
+                }
+
+                if (_count > 0)
+                {
+                    array[0] = _first;
+                }
+
+                if (_count > 1)
+                {
+                    array[1] = _second;
+                }
+
+                if (_count > 2)
+                {
+                    array[2] = _third;
+                }
+
+                if (_count > 3)
+                {
+                    array[3] = _fourth;
+                }
+
+                return array;
+            }
+        }
+
+        private sealed class TypedDictionaryReader<TKey, TValue> : TypedContainerReader
+        {
+            private readonly Type _type;
+            private volatile TypedReader<TValue> _itemReader;
+
+            public TypedDictionaryReader(Type type)
+            {
+                _type = type;
+            }
+
+            public override object Read(TextReader reader, JsonOptions options, object target)
+            {
+                var result = target ?? CreateInstance(null, _type, 0, options, null);
+                var dictionary = result as IDictionary<TKey, TValue>;
+                if (dictionary == null)
+                    return ChangeType(ReadValue(reader, options), _type, options);
+
+                var itemReader = _itemReader;
+                if (itemReader == null)
+                {
+                    itemReader = (TypedReader<TValue>)TypedReader.Get(typeof(TValue));
+                    _itemReader = itemReader;
+                }
+
+                reader.Read();
+                if (ReadWhitespaces(reader) && reader.Peek() == '}')
+                {
+                    reader.Read();
+                    return result;
+                }
+
+                do
+                {
+                    var name = ReadMemberName(reader, options);
+                    var key = (TKey)ChangeType(name, typeof(TKey), options);
+                    dictionary[key] = itemReader.ReadTyped(reader, options, null);
+                }
+                while (ReadContainerNext(reader, '}', options));
+
+                return result;
+            }
+        }
+
+        private static object ReadDocument(TextReader reader, JsonOptions options)
+        {
+            var value = ReadValue(reader, options);
+            if (ReadWhitespaces(reader))
+            {
+                HandleException(GetUnexpectedCharacterException(GetPosition(reader), (char)reader.Peek()), options);
+            }
+
+            return value;
+        }
+
+        private static object ReadValue(TextReader reader, JsonOptions options)
+        {
+            if (!ReadWhitespaces(reader))
+            {
+                HandleException(GetEofException('"'), options);
+                return null;
+            }
+
+            var c = (char)reader.Peek();
             if (c == '"')
             {
                 reader.Read();
-                var s = ReadString(reader, options);
-                if (options.SerializationOptions.HasFlag(JsonSerializationOptions.AutoParseDateTime))
-                {
-                    if (TryParseDateTime(s, options.DateTimeStyles, out var dt))
-                        return dt;
-                }
-                return s;
+                var text = ReadString(reader, options);
+                if (options.SerializationOptions.HasFlag(JsonSerializationOptions.AutoParseDateTime) &&
+                    TryParseDateTime(text, options.DateTimeStyles, out var dateTime))
+                    return dateTime;
+
+                return text;
             }
 
             if (c == '{')
             {
-                var dic = ReadDictionary(reader, options);
+                var dictionary = ReadDictionary(reader, options);
 #if !NET8_0_OR_GREATER
-                if (options.SerializationOptions.HasFlag(JsonSerializationOptions.UseISerializable))
+                if (options.SerializationOptions.HasFlag(JsonSerializationOptions.UseISerializable) &&
+                    dictionary.TryGetValue(_serializationTypeToken, out var typeValue))
                 {
-                    if (dic.TryGetValue(_serializationTypeToken, out var o))
+                    var typeName = string.Format(CultureInfo.InvariantCulture, _zeroArg, typeValue);
+                    if (!string.IsNullOrEmpty(typeName))
                     {
-                        var typeName = string.Format(CultureInfo.InvariantCulture, "{0}", o);
-                        if (!string.IsNullOrEmpty(typeName))
-                        {
-                            dic.Remove(_serializationTypeToken);
-                            return ReadSerializable(reader, options, typeName, dic);
-                        }
+                        dictionary.Remove(_serializationTypeToken);
+                        return ReadSerializable(reader, options, typeName, dictionary);
                     }
                 }
 #endif
-                return dic;
+                return dictionary;
             }
 
             if (c == '[')
                 return ReadArray(reader, options);
 
             if (c == 'n')
-                return ReadNew(reader, options, out arrayEnd);
+                return ReadNew(reader, options);
 
-            // handles the null/true/false cases
-            if (char.IsLetterOrDigit(c) || c == '.' || c == '-' || c == '+')
-                return ReadNumberOrLiteral(reader, options, out arrayEnd);
+            if (c == 't' || c == 'f' || c == '-' || (c >= '0' && c <= '9'))
+                return ReadNumberOrLiteral(reader, options);
 
-            if (arrayMode && (c == ']'))
-            {
-                reader.Read();
-                arrayEnd = true;
-                return DBNull.Value; // marks array end
-            }
-
-            if (arrayMode && (c == ','))
-            {
-                reader.Read();
-                return DBNull.Value; // marks array end
-            }
-
+            reader.Read();
             HandleException(GetUnexpectedCharacterException(GetPosition(reader), c), options);
             return null;
         }
 
-        private static object ReadNew(TextReader reader, JsonOptions options, out bool arrayEnd)
+        private static object ReadNew(TextReader reader, JsonOptions options)
         {
-            arrayEnd = false;
-            var sb = new StringBuilder();
-            do
+            var builder = new StringBuilder();
+            while (reader.Peek() >= 0)
             {
-                var i = reader.Peek();
-                if (i < 0)
+                var c = (char)reader.Peek();
+                if (c == '}' || c == ']' || c == ',')
                     break;
 
-                if (((char)i) == '}')
+                builder.Append((char)reader.Read());
+                if (c == ')')
                     break;
-
-                var c = (char)reader.Read();
-                if (c == ',')
-                    break;
-
-                if (c == ']')
-                {
-                    arrayEnd = true;
-                    break;
-                }
-
-                sb.Append(c);
             }
-            while (true);
 
-            var text = sb.ToString();
-            if (string.Compare(_null, text.Trim(), StringComparison.OrdinalIgnoreCase) == 0)
+            var text = builder.ToString().Trim();
+            if (text == _null)
                 return null;
 
-            if (text.StartsWith(_dateStartJs) && text.EndsWith(_dateEndJs))
+            if (text.StartsWith(_dateStartJs, StringComparison.Ordinal) && text.EndsWith(_dateEndJs, StringComparison.Ordinal) &&
+                TryParseDateTime(text, options.DateTimeStyles, out var dateTime))
+                return dateTime;
+
+            HandleException(GetUnexpectedCharacterException(GetPosition(reader), text[0]), options);
+            return null;
+        }
+
+        private static object ReadNumberOrLiteral(TextReader reader, JsonOptions options)
+        {
+            var builder = new StringBuilder();
+            while (reader.Peek() >= 0)
             {
-                if (long.TryParse(text.Substring(_dateStartJs.Length, text.Length - _dateStartJs.Length - _dateEndJs.Length), out var l))
-                    return new DateTime((l * 10000) + _minDateTimeTicks, DateTimeKind.Utc);
+                var c = (char)reader.Peek();
+                if (c == '}' || c == ']' || c == ',' || IsJsonWhitespace(c))
+                    break;
+
+                builder.Append((char)reader.Read());
+            }
+
+            return ParseNumberOrLiteral(builder.ToString(), reader, options);
+        }
+
+        private static object ParseNumberOrLiteral(string text, TextReader reader, JsonOptions options)
+        {
+            if (text == _true)
+                return true;
+
+            if (text == _false)
+                return false;
+
+            if (IsJsonNumber(text))
+            {
+                if (text.IndexOf('e') >= 0 || text.IndexOf('E') >= 0)
+                {
+                    if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) &&
+                        !double.IsInfinity(number) && !double.IsNaN(number))
+                        return number;
+                }
+                else if (text.IndexOf('.') >= 0)
+                {
+                    if (decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
+                        return number;
+
+                    if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var real) && !double.IsInfinity(real))
+                        return real;
+                }
+                else
+                {
+                    if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer))
+                        return integer;
+
+                    if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longInteger))
+                        return longInteger;
+
+                    if (decimal.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
+                        return number;
+                }
             }
 
             HandleException(GetUnexpectedCharacterException(GetPosition(reader), text[0]), options);
             return null;
         }
 
-        private static object ReadNumberOrLiteral(TextReader reader, JsonOptions options, out bool arrayEnd)
+#if NET8_0_OR_GREATER
+        private static bool IsJsonNumber(string text) => IsJsonNumber(text.AsSpan());
+        private static bool IsJsonNumber(ReadOnlySpan<char> text)
+#else
+        private static bool IsJsonNumber(string text)
+#endif
         {
-            arrayEnd = false;
-            var sb = new StringBuilder();
-            do
-            {
-                var i = reader.Peek();
-                if (i < 0)
-                    break;
-
-                if (((char)i) == '}')
-                    break;
-
-                var c = (char)reader.Read();
-                if (char.IsWhiteSpace(c) || c == ',')
-                    break;
-
-                if (c == ']')
-                {
-                    arrayEnd = true;
-                    break;
-                }
-
-                sb.Append(c);
-            }
-            while (true);
-
-            var text = sb.ToString();
-            if (string.Compare(_null, text, StringComparison.OrdinalIgnoreCase) == 0)
-                return null;
-
-            if (string.Compare(_true, text, StringComparison.OrdinalIgnoreCase) == 0)
-                return true;
-
-            if (string.Compare(_false, text, StringComparison.OrdinalIgnoreCase) == 0)
+            var index = text[0] == '-' ? 1 : 0;
+            if (index == text.Length)
                 return false;
 
-            if (text.LastIndexOf("e", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (text[index] == '0')
             {
-                if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
-                    return d;
+                index++;
             }
             else
             {
-                if (text.IndexOf(".", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    if (decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var de))
-                        return de;
-                }
-                else
-                {
-                    if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i))
-                        return i;
+                if (text[index] < '1' || text[index] > '9')
+                    return false;
 
-                    if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var l))
-                        return l;
-
-                    if (decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var de))
-                        return de;
+                while (index < text.Length && text[index] >= '0' && text[index] <= '9')
+                {
+                    index++;
                 }
             }
 
-            HandleException(GetUnexpectedCharacterException(GetPosition(reader), text[0]), options);
-            return null;
+            if (index < text.Length && text[index] == '.')
+            {
+                var start = ++index;
+                while (index < text.Length && text[index] >= '0' && text[index] <= '9')
+                {
+                    index++;
+                }
+
+                if (index == start)
+                    return false;
+            }
+
+            if (index < text.Length && (text[index] == 'e' || text[index] == 'E'))
+            {
+                index++;
+                if (index < text.Length && (text[index] == '+' || text[index] == '-'))
+                {
+                    index++;
+                }
+
+                var start = index;
+                while (index < text.Length && text[index] >= '0' && text[index] <= '9')
+                {
+                    index++;
+                }
+
+                if (index == start)
+                    return false;
+            }
+
+            return index == text.Length;
         }
 
         /// <summary>
@@ -1373,6 +2085,24 @@ namespace ZeroDep
         /// </returns>
         public static bool TryParseDateTime(string text, DateTimeStyles styles, out DateTime dt)
         {
+            try
+            {
+                return TryParseDateTimeCore(text, styles, out dt);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                dt = DateTime.MinValue;
+                return false;
+            }
+            catch (OverflowException)
+            {
+                dt = DateTime.MinValue;
+                return false;
+            }
+        }
+
+        private static bool TryParseDateTimeCore(string text, DateTimeStyles styles, out DateTime dt)
+        {
             dt = DateTime.MinValue;
             if (text == null)
                 return false;
@@ -1383,12 +2113,14 @@ namespace ZeroDep
                 {
                     using (var reader = new StringReader(text))
                     {
-                        reader.Read(); // skip "
+                        reader.Read();
                         var options = new JsonOptions
                         {
                             ThrowExceptions = false
                         };
                         text = ReadString(reader, options);
+                        if (text == null || options.Exceptions.Length > 0)
+                            return false;
                     }
                 }
             }
@@ -1439,16 +2171,16 @@ namespace ZeroDep
 
                 if (tz >= 0)
                 {
-                    if (DateTime.TryParseExact(text2, "s", null, DateTimeStyles.AssumeLocal, out dt))
+                    if (DateTime.TryParseExact(text2, "s", null, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out dt))
                     {
                         if (offsetHours != 0)
                         {
-                            dt = dt.AddHours(offsetHours);
+                            dt = dt.AddHours(-offsetHours);
                         }
 
                         if (offsetMinutes != 0)
                         {
-                            dt = dt.AddMinutes(offsetMinutes);
+                            dt = dt.AddMinutes(-offsetMinutes);
                         }
                         return true;
                     }
@@ -1494,7 +2226,7 @@ namespace ZeroDep
 
             // read this http://weblogs.asp.net/bleroy/archive/2008/01/18/dates-and-json.aspx
             string ticks = null;
-            if (text.StartsWith(_dateStartJs) && text.EndsWith(_dateEndJs))
+            if (text.StartsWith(_dateStartJs, StringComparison.Ordinal) && text.EndsWith(_dateEndJs, StringComparison.Ordinal))
             {
                 ticks = text.Substring(_dateStartJs.Length, text.Length - _dateStartJs.Length - _dateEndJs.Length).Trim();
             }
@@ -1527,7 +2259,7 @@ namespace ZeroDep
 
                 if (long.TryParse(ticks, NumberStyles.Number, CultureInfo.InvariantCulture, out var l))
                 {
-                    dt = new DateTime((l * 10000) + _minDateTimeTicks, kind);
+                    dt = new DateTime(checked((l * 10000) + _minDateTimeTicks), kind);
                     if (offsetHours != 0)
                     {
                         dt = dt.AddHours(offsetHours);
@@ -1603,8 +2335,8 @@ namespace ZeroDep
             return (ushort)u;
         }
 
-        private static bool ReadWhitespaces(TextReader reader) => ReadWhile(reader, char.IsWhiteSpace);
-        private static bool ReadWhile(TextReader reader, Predicate<char> cont)
+        private static bool IsJsonWhitespace(char c) => c == ' ' || c == '\t' || c == '\r' || c == '\n';
+        private static bool ReadWhitespaces(TextReader reader)
         {
             do
             {
@@ -1612,7 +2344,7 @@ namespace ZeroDep
                 if (i < 0)
                     return false;
 
-                if (!cont((char)i))
+                if (!IsJsonWhitespace((char)i))
                     return true;
 
                 reader.Read();
@@ -1657,11 +2389,56 @@ namespace ZeroDep
         /// </summary>
         public class MemberDefinition
         {
+            internal void ReadTypedEntry(TextReader reader, object target, JsonOptions options)
+            {
+                if (Type == typeof(object))
+                {
+                    ApplyEntry(null, target, WireName, ReadValue(reader, options), options);
+                    return;
+                }
+
+                ReadWhitespaces(reader);
+                var c = reader.Peek();
+                var typedReader = _typedReader;
+                if (typedReader == null)
+                {
+                    typedReader = TypedReader.Get(Type);
+                    _typedReader = typedReader;
+                }
+
+                object existing = null;
+                if (c == '[' || c == '{')
+                {
+                    if (!typedReader.CanPopulate((char)c, options))
+                    {
+                        ApplyEntry(null, target, WireName, ReadValue(reader, options), options);
+                        return;
+                    }
+
+                    try
+                    {
+                        existing = Accessor.Get(target);
+                    }
+                    catch when (options.SerializationOptions.HasFlag(JsonSerializationOptions.ContinueOnValueError))
+                    {
+                        SkipValue(reader, options);
+                        return;
+                    }
+                }
+
+                var value = typedReader.Read(reader, options, existing);
+                if (existing == null || !ReferenceEquals(existing, value))
+                {
+                    Accessor.Set(target, value);
+                }
+            }
+
             private string _name;
             private string _wireName;
             private string _escapedWireName;
             private IMemberAccessor _accessor;
             private Type _type;
+            private volatile TypedReader _typedReader;
 
             /// <summary>
             /// Gets or sets the member name.
@@ -1754,7 +2531,11 @@ namespace ZeroDep
             public virtual Type Type
             {
                 get => _type;
-                set => _type = value ?? throw new ArgumentNullException(nameof(value));
+                set
+                {
+                    _type = value ?? throw new ArgumentNullException(nameof(value));
+                    _typedReader = null;
+                }
             }
 
             /// <summary>
@@ -1849,7 +2630,6 @@ namespace ZeroDep
                         return;
                     }
                 }
-
 
                 var cvalue = ChangeType(target, value, Type, options);
                 Accessor.Set(target, cvalue);
@@ -2097,6 +2877,7 @@ namespace ZeroDep
                 {
                     writer.Write(@enum.ToString(_enumFormat));
                 }
+
                 return;
             }
 
@@ -2110,6 +2891,7 @@ namespace ZeroDep
                 {
                     writer.Write(ts.Ticks);
                 }
+
                 return;
             }
 
@@ -2139,6 +2921,7 @@ namespace ZeroDep
                     writer.Write((dto.ToUniversalTime().Ticks - _minDateTimeTicks) / 10000);
                     writer.Write(_dateEnd);
                 }
+
                 return;
             }
             // read this http://weblogs.asp.net/bleroy/archive/2008/01/18/dates-and-json.aspx
@@ -2158,7 +2941,7 @@ namespace ZeroDep
                 else if (options.SerializationOptions.HasFlag(JsonSerializationOptions.DateFormatIso8601))
                 {
                     writer.Write('"');
-                    writer.Write(EscapeString(dt.ToUniversalTime().ToString("s")), options);
+                    writer.Write(EscapeString(dt.ToUniversalTime().ToString("s")));
                     AppendTimeZoneUtcOffset(writer, dt);
                     writer.Write('"');
                 }
@@ -2173,6 +2956,7 @@ namespace ZeroDep
                     AppendTimeZoneUtcOffset(writer, dt);
                     writer.Write(_dateEnd);
                 }
+
                 return;
             }
 
@@ -2194,6 +2978,7 @@ namespace ZeroDep
                 {
                     WriteUnescapedString(writer, guid.ToString());
                 }
+
                 return;
             }
 
@@ -2201,12 +2986,6 @@ namespace ZeroDep
             if (uri != null)
             {
                 WriteString(writer, uri.GetComponents(UriComponents.SerializationInfoString, UriFormat.UriEscaped));
-                return;
-            }
-
-            if (value is Array array)
-            {
-                WriteArray(writer, array, objectGraph, options);
                 return;
             }
 
@@ -2224,41 +3003,44 @@ namespace ZeroDep
 
             objectGraph.Add(value, null);
             options.SerializationLevel++;
-
-            if (value is IDictionary dictionary)
+            try
             {
-                WriteDictionary(writer, dictionary, objectGraph, options);
-                options.SerializationLevel--;
-                return;
-            }
-
-            // ExpandoObject falls here
-            if (TypeDef.IsKeyValuePairEnumerable(value.GetType(), out var _, out var _))
-            {
-                WriteDictionary(writer, new KeyValueTypeDictionary(value), objectGraph, options);
-                options.SerializationLevel--;
-                return;
-            }
-
-            if (value is IEnumerable enumerable)
-            {
-                WriteEnumerable(writer, enumerable, objectGraph, options);
-                options.SerializationLevel--;
-                return;
-            }
-
-            if (options.SerializationOptions.HasFlag(JsonSerializationOptions.StreamsAsBase64))
-            {
-                if (value is Stream stream)
+                if (value is Array array)
                 {
-                    WriteBase64Stream(writer, stream, objectGraph, options);
-                    options.SerializationLevel--;
+                    WriteArray(writer, array, objectGraph, options);
                     return;
                 }
-            }
 
-            WriteObject(writer, value, objectGraph, options);
-            options.SerializationLevel--;
+                if (value is IDictionary dictionary)
+                {
+                    WriteDictionary(writer, dictionary, objectGraph, options);
+                    return;
+                }
+
+                if (TypeDef.IsKeyValuePairEnumerable(value.GetType(), out var _, out var _))
+                {
+                    WriteDictionary(writer, new KeyValueTypeDictionary(value), objectGraph, options);
+                    return;
+                }
+
+                if (value is IEnumerable enumerable)
+                {
+                    WriteEnumerable(writer, enumerable, objectGraph, options);
+                    return;
+                }
+
+                if (options.SerializationOptions.HasFlag(JsonSerializationOptions.StreamsAsBase64) && value is Stream stream)
+                {
+                    WriteBase64Stream(writer, stream, objectGraph, options);
+                    return;
+                }
+
+                WriteObject(writer, value, objectGraph, options);
+            }
+            finally
+            {
+                options.SerializationLevel--;
+            }
         }
 
         /// <summary>
@@ -2282,37 +3064,40 @@ namespace ZeroDep
             SetOptions(objectGraph, options);
 
             var total = 0L;
-            if (writer is StreamWriter sw && sw.BaseStream != null)
+            var bytes = new byte[options.FinalStreamingBufferChunkSize];
+            var chars = new char[((bytes.Length + 2) / 3) * 4];
+            var buffered = 0;
+            writer.Write('"');
+            while (true)
             {
-                sw.Flush();
-                return WriteBase64Stream(stream, sw.BaseStream, options);
-            }
+                var read = stream.Read(bytes, buffered, bytes.Length - buffered);
+                if (read == 0)
+                    break;
 
-            if (writer is IndentedTextWriter itw && itw.InnerWriter != null)
-            {
-                itw.Flush();
-                return WriteBase64Stream(itw.InnerWriter, stream, objectGraph, options);
-            }
-
-            using (var ms = new MemoryStream())
-            {
-                var bytes = new byte[options.FinalStreamingBufferChunkSize];
-                do
+                total += read;
+                buffered += read;
+                var count = buffered - buffered % 3;
+                if (count > 0)
                 {
-                    var read = stream.Read(bytes, 0, bytes.Length);
-                    if (read == 0)
-                        break;
-
-                    ms.Write(bytes, 0, read);
-                    total += read;
+                    var written = Convert.ToBase64CharArray(bytes, 0, count, chars, 0);
+                    writer.Write(chars, 0, written);
                 }
-                while (true);
 
-                writer.Write('"');
-                writer.Write(Convert.ToBase64String(ms.ToArray()));
-                writer.Write('"');
-                return total;
+                buffered -= count;
+                if (buffered > 0)
+                {
+                    Buffer.BlockCopy(bytes, count, bytes, 0, buffered);
+                }
             }
+
+            if (buffered > 0)
+            {
+                var written = Convert.ToBase64CharArray(bytes, 0, buffered, chars, 0);
+                writer.Write(chars, 0, written);
+            }
+
+            writer.Write('"');
+            return total;
         }
 
         private static void SetOptions(object obj, JsonOptions options)
@@ -2321,30 +3106,6 @@ namespace ZeroDep
             {
                 holder.Options = options;
             }
-        }
-
-        private static long WriteBase64Stream(Stream inputStream, Stream outputStream, JsonOptions options)
-        {
-            outputStream.WriteByte((byte)'"');
-            // don't dispose this stream or it will dispose the outputStream as well
-            var b64 = new CryptoStream(outputStream, new ToBase64Transform(), CryptoStreamMode.Write);
-            var total = 0L;
-            var bytes = new byte[options.FinalStreamingBufferChunkSize];
-            do
-            {
-                var read = inputStream.Read(bytes, 0, bytes.Length);
-                if (read == 0)
-                    break;
-
-                b64.Write(bytes, 0, read);
-                total += read;
-            }
-            while (true);
-
-            b64.FlushFinalBlock();
-            b64.Flush();
-            outputStream.WriteByte((byte)'"');
-            return total;
         }
 
         private static bool InternalIsKeyValuePairEnumerable(Type type, out Type keyType, out Type valueType)
@@ -2895,7 +3656,7 @@ namespace ZeroDep
         public static string EscapeString(string value)
         {
             if (string.IsNullOrEmpty(value))
-                return null;
+                return value;
 
             StringBuilder builder = null;
             var startIndex = 0;
@@ -3186,7 +3947,7 @@ namespace ZeroDep
 
         private sealed class TypeDef
         {
-            private static readonly Dictionary<string, TypeDef> _defs = new Dictionary<string, TypeDef>();
+            private static readonly Dictionary<Type, Dictionary<string, TypeDef>> _defs = new Dictionary<Type, Dictionary<string, TypeDef>>();
             private static readonly Dictionary<Type, KeyValueType> _iskvpe = new Dictionary<Type, KeyValueType>();
             private static readonly object _lock = new object();
 
@@ -3232,6 +3993,61 @@ namespace ZeroDep
                 return null;
             }
 
+            public bool CanReadTyped()
+            {
+                foreach (var member in _deserializationMembers)
+                {
+                    if (member.GetType() != typeof(MemberDefinition))
+                        return false;
+                }
+
+                return true;
+            }
+
+            public string GetWireName(string text, int start, int length)
+            {
+                foreach (var member in _deserializationMembers)
+                {
+                    var name = member.WireName;
+                    if (name.Length == length && string.CompareOrdinal(text, start, name, 0, length) == 0)
+                        return name;
+                }
+
+                return null;
+            }
+
+            public object ReadObject(TextReader reader, JsonOptions options, object target)
+            {
+                var instance = target ?? CreateInstance(null, _type, 0, options, null);
+                var names = new TypedMemberNames();
+                reader.Read();
+                if (ReadWhitespaces(reader) && reader.Peek() == '}')
+                {
+                    reader.Read();
+                    return instance;
+                }
+
+                do
+                {
+                    var name = ReadMemberName(reader, options, this);
+                    var member = GetDeserializationMember(name);
+                    if (member == null || instance == null)
+                    {
+                        SkipValue(reader, options);
+                    }
+                    else
+                    {
+                        if (!member.Type.IsValueType && member.Type != typeof(string) && !names.Add(name))
+                            throw new DuplicateTypedMemberException();
+
+                        member.ReadTypedEntry(reader, instance, options);
+                    }
+                }
+                while (ReadContainerNext(reader, '}', options));
+
+                return instance;
+            }
+
             public void ApplyEntry(IDictionary dictionary, object target, string key, object value, JsonOptions options)
             {
                 var member = GetDeserializationMember(key);
@@ -3248,7 +4064,16 @@ namespace ZeroDep
                 {
                     var nameChanged = false;
                     var name = member.WireName;
-                    var value = member.Accessor.Get(component);
+                    object value;
+                    try
+                    {
+                        value = member.Accessor.Get(component);
+                    }
+                    catch when (options.SerializationOptions.HasFlag(JsonSerializationOptions.ContinueOnValueError))
+                    {
+                        continue;
+                    }
+
                     if (options.WriteNamedValueObjectCallback != null)
                     {
                         var e = new JsonEventArgs(writer, value, objectGraph, options, name, component)
@@ -3325,16 +4150,22 @@ namespace ZeroDep
 
             public override string ToString() => _type.AssemblyQualifiedName;
 
-            private static string GetKey(Type type, JsonOptions options) => type.AssemblyQualifiedName + '\0' + options.GetCacheKey();
             private static TypeDef UnlockedGet(Type type, JsonOptions options)
             {
-                var key = GetKey(type, options);
-                if (!_defs.TryGetValue(key, out var ta))
+                if (!_defs.TryGetValue(type, out var definitions))
                 {
-                    ta = new TypeDef(type, options);
-                    _defs.Add(key, ta);
+                    definitions = new Dictionary<string, TypeDef>();
+                    _defs.Add(type, definitions);
                 }
-                return ta;
+
+                var key = options.GetCacheKey();
+                if (!definitions.TryGetValue(key, out var definition))
+                {
+                    definition = new TypeDef(type, options);
+                    definitions.Add(key, definition);
+                }
+
+                return definition;
             }
 
             public static void Lock<T>(Action<T> action, T state)
@@ -3428,6 +4259,13 @@ namespace ZeroDep
             {
                 foreach (var info in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
                 {
+                    if (info.GetIndexParameters().Length > 0)
+                        continue;
+
+                    if (serialization && options.SerializationOptions.HasFlag(JsonSerializationOptions.SkipGetOnly) &&
+                        info.GetSetMethod() == null)
+                        continue;
+
                     if (options.SerializationOptions.HasFlag(JsonSerializationOptions.UseJsonAttribute))
                     {
                         var ja = GetJsonAttribute(info);
@@ -3675,17 +4513,24 @@ namespace ZeroDep
 
         private sealed class PropertyDescriptorAccessor : IMemberAccessor
         {
+            private const string _reflectionDescriptorTypeName = "System.ComponentModel.ReflectPropertyDescriptor";
             private readonly PropertyDescriptor _pd;
+            private readonly bool _checksReadOnly;
 
             public PropertyDescriptorAccessor(PropertyDescriptor pd)
             {
                 _pd = pd;
+                var type = pd.GetType();
+                _checksReadOnly = type.Assembly != typeof(PropertyDescriptor).Assembly || type.FullName != _reflectionDescriptorTypeName;
             }
 
             public object Get(object component) => _pd.GetValue(component);
             public void Set(object component, object value)
             {
-                if (_pd.IsReadOnly)
+
+                // the built-in descriptor checks read-only attributes inside SetValue.
+                // custom descriptors still need the external guard.
+                if (_checksReadOnly && _pd.IsReadOnly)
                     return;
 
                 _pd.SetValue(component, value);
@@ -5145,6 +5990,7 @@ namespace ZeroDep
             clone._exceptions.AddRange(_exceptions);
             clone.FormattingTab = FormattingTab;
             clone.GetListObjectCallback = GetListObjectCallback;
+            clone.ObjectGraph = ObjectGraph;
             clone.GuidFormat = GuidFormat;
             clone.MapEntryCallback = MapEntryCallback;
             clone.MaximumExceptionsCount = MaximumExceptionsCount;
@@ -5613,5 +6459,5 @@ namespace ZeroDep
 #pragma warning restore IDE0057 // Use range operator
 #pragma warning restore IDE0090 // Use 'new(...)'
 #pragma warning restore IDE0063 // Use simple 'using' statement
-
+#pragma warning restore IDE0130 // Namespace does not match folder structure
 }

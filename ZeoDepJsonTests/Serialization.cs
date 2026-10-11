@@ -1,10 +1,10 @@
-﻿using System;
+﻿using NUnit.Framework;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
-using NUnit.Framework;
 using ZeroDep;
 
 namespace ZeoDepJsonTests
@@ -49,30 +49,44 @@ namespace ZeoDepJsonTests
             var list = new List<Customer>();
             for (var i = 0; i < 10; i++)
             {
-                var customer = new Customer();
-                customer.Index = i;
+                var customer = new Customer
+                {
+                    Index = i
+                };
                 list.Add(customer);
 
-                var address1 = new Address();
-                address1.ZipCode = 75000;
-                address1.City = new City();
-                address1.City.Name = "Paris";
-                address1.City.Country = new Country();
-                address1.City.Country.Name = "France";
+                var address1 = new Address
+                {
+                    ZipCode = 75000,
+                    City = new City
+                    {
+                        Name = "Paris",
+                        Country = new Country
+                        {
+                            Name = "France"
+                        }
+                    }
+                };
 
-                var address2 = new Address();
-                address2.ZipCode = 10001;
-                address2.City = new City();
-                address2.City.Name = "New York";
-                address2.City.Country = new Country();
-                address2.City.Country.Name = "USA";
+                var address2 = new Address
+                {
+                    ZipCode = 10001,
+                    City = new City
+                    {
+                        Name = "New York",
+                        Country = new Country
+                        {
+                            Name = "USA"
+                        }
+                    }
+                };
 
-                customer.Addresses = new[] { address1, address2 };
+                customer.Addresses = [address1, address2];
 
-                customer.GeoPoints = new List<GeoPoint> {
+                customer.GeoPoints = [
                     new GeoPoint { Latitude = 48.34266, Longitude = 7.30574 },
                     new GeoPoint { Latitude = 28.20042, Longitude = 15.99122 }
-                };
+                ];
             }
 
             var json = Json.Serialize(list);
@@ -87,29 +101,43 @@ namespace ZeoDepJsonTests
             var dic = new Dictionary<Guid, Customer>();
             for (var i = 0; i < 10; i++)
             {
-                var customer = new Customer();
-                customer.Index = i;
-                customer.Name = "This is a name 这是一个名字" + Environment.TickCount;
-                var address1 = new Address();
-                address1.ZipCode = 75000;
-                address1.City = new City();
-                address1.City.Name = "Paris";
-                address1.City.Country = new Country();
-                address1.City.Country.Name = "France";
+                var customer = new Customer
+                {
+                    Index = i,
+                    Name = "This is a name 这是一个名字" + Environment.TickCount
+                };
+                var address1 = new Address
+                {
+                    ZipCode = 75000,
+                    City = new City
+                    {
+                        Name = "Paris",
+                        Country = new Country
+                        {
+                            Name = "France"
+                        }
+                    }
+                };
 
-                var address2 = new Address();
-                address2.ZipCode = 10001;
-                address2.City = new City();
-                address2.City.Name = "New York";
-                address2.City.Country = new Country();
-                address2.City.Country.Name = "USA";
+                var address2 = new Address
+                {
+                    ZipCode = 10001,
+                    City = new City
+                    {
+                        Name = "New York",
+                        Country = new Country
+                        {
+                            Name = "USA"
+                        }
+                    }
+                };
 
-                customer.Addresses = new[] { address1, address2 };
+                customer.Addresses = [address1, address2];
 
-                customer.GeoPoints = new List<GeoPoint> {
+                customer.GeoPoints = [
                     new GeoPoint { Latitude = 48.34266, Longitude = 7.30574 },
                     new GeoPoint { Latitude = 28.20042, Longitude = 15.99122 }
-                };
+                ];
 
                 dic[customer.Id] = customer;
             }
@@ -162,7 +190,7 @@ namespace ZeoDepJsonTests
 
         private class CustomObjectGraph : IDictionary<object, object>, Json.IOptionsHolder
         {
-            private readonly Dictionary<object, int> _hash = new Dictionary<object, int>();
+            private readonly Dictionary<object, int> _hash = [];
 
             public JsonOptions Options { get; set; }
 
